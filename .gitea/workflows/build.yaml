@@ -1,0 +1,23 @@
+name: Package Build
+on:
+  push:
+    branches:
+      - main
+jobs:
+  packages:
+    runs-on: "rocky-amd64"
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Download Resources
+        uses: actions/download@v1
+      - name: Build Package
+        uses: actions/package-builder@v1
+        with:
+          runtime: rocky9amd64,rocky9CrossArm64,rocky10amd64,rocky10CrossArm64
+          spec: "${{ vars.PACKAGE_BUILDER_SPEC }}"
+      - name: Upload Package
+        uses: actions/package-release@v2
+        with:
+          token: "${{secrets.PACKAGE_UPLOAD_TOKEN}}"
+          glob: "${{ vars.PACKAGE_STABLE_GLOB }}"

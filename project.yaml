@@ -1,0 +1,9 @@
+metadata:
+  name: "webdav-server"
+  version: "1.0.0"
+resources:
+  - name: "{{ .metadata.name }}-{{ .metadata.version}}.tar.gz"
+    git:
+      url: "https://github.com/owner/{{ .metadata.name }}.git"
+      version: "v{{ .metadata.version }}"
+      prefix: "{{ .metadata.name }}-{{ .metadata.version }}/"
