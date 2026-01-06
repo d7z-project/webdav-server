@@ -1,0 +1,14 @@
+[Unit]
+Description=Simple WebDAV Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/webdav-server
+Restart=always
+User=webdav-server
+Group=webdav-server
+WorkingDirectory=/var/lib/webdav
+
+[Install]
+WantedBy=multi-user.target

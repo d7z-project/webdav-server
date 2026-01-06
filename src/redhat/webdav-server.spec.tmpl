@@ -3,37 +3,25 @@
 Name:           {{ .metadata.name }}
 Version:        {{ .metadata.version }}
 Release:        {{ default 1 .metadata.release | toString }}%{?dist}
-Summary:        
-License:        
-URL:            
-Source0:        %{name}-%{version}.tar.gz
+Summary:        简单的 Webdav 服务器
+License:        Apache2.0
+URL:            https://code.d7z.net/packages/webdav-server
+Source0:        webdav-server
 
+Source100:      webdav-server.service
 Source201:      sysusersd.conf
 Source202:      tmpfiles.conf
 
-BuildRequires:  
-Requires:       
-
 %description
-
-
-%prep
-%autosetup
-
-
-%build
-%configure
-%make_build
-
+简单的 Webdav 服务器
 
 %install
-%make_install
+install -Dm0755 ${S:0} %{buildroot}%{_bindir}/webdav-server
 %{__install} -Dm0644 %{SOURCE201} %{buildroot}%{_sysusersdir}/%{name}.conf
 %{__install} -Dm0644 %{SOURCE202} %{buildroot}%{_tmpfilesdir}/%{name}.conf
 
 
 %files
-%license LICENSE
 %{_tmpfilesdir}/%{name}.conf
 %{_sysusersdir}/%{name}.conf
 
