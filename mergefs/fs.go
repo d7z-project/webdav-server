@@ -133,6 +133,16 @@ func (m *MountFs) Create(name string) (afero.File, error) {
 }
 
 func (m *MountFs) Mkdir(name string, perm os.FileMode) error {
+	name = cleanPath(name)
+	// 获取挂载信息
+	if _, ok := m.getMountForDirectory(name); ok {
+		// 已经存在挂载点，返回错误
+		return &os.PathError{
+			Op:   "mkdir",
+			Path: name,
+			Err:  os.ErrExist,
+		}
+	}
 	mount, p := m.GetMount(name)
 	return mount.Mkdir(p, perm)
 }
@@ -140,16 +150,6 @@ func (m *MountFs) Mkdir(name string, perm os.FileMode) error {
 func (m *MountFs) MkdirAll(path string, perm os.FileMode) error {
 	mount, relPath := m.GetMount(path)
 	return mount.MkdirAll(relPath, perm)
-}
-
-func (m *MountFs) Open(name string) (afero.File, error) {
-	mount, p := m.GetMount(name)
-	return mount.Open(p)
-}
-
-func (m *MountFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
-	mount, p := m.GetMount(name)
-	return mount.OpenFile(p, flag, perm)
 }
 
 func (m *MountFs) Remove(name string) error {
@@ -240,6 +240,14 @@ func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst
 }
 
 func (m *MountFs) Stat(name string) (os.FileInfo, error) {
+	name = cleanPath(name)
+	if _, ok := m.getMountForDirectory(name); ok {
+		return &mountFileInfo{
+			name: filepath.Base(name),
+			mode: os.ModeDir | 0755,
+		}, nil
+	}
+
 	mount, p := m.GetMount(name)
 	return mount.Stat(p)
 }
@@ -263,7 +271,7 @@ func (m *MountFs) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	return mount.Chtimes(p, atime, mtime)
 }
 
-// 实现 afero.Lstater 接口（如果底层文件系统支持）
+// LstatIfPossible 实现 afero.Lstater 接口（如果底层文件系统支持）
 func (m *MountFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
 	mount, p := m.GetMount(name)
 	if lstater, ok := mount.(afero.Lstater); ok {
@@ -272,6 +280,31 @@ func (m *MountFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
 
 	info, err := mount.Stat(p)
 	return info, false, err
+}
+
+// OpenFile 修改 OpenFile 方法，返回包装后的文件对象
+func (m *MountFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+	mount, p := m.GetMount(name)
+	file, err := mount.OpenFile(p, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+	// 获取文件信息以判断是否为目录
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if info.IsDir() {
+		return newMountFsFile(file, m, name, true), nil
+	}
+
+	// 普通文件直接返回
+	return file, nil
+}
+
+func (m *MountFs) Open(name string) (afero.File, error) {
+	return m.OpenFile(name, os.O_RDONLY, 0)
 }
 
 // SymlinkIfPossible 实现 afero.Linker 接口（如果底层文件系统支持）
@@ -336,4 +369,47 @@ func (m *MountFs) GetMountInfo(name string) (string, afero.Fs, string) {
 		}
 	}
 	return "/", m.defaultFs, name
+}
+
+// getMountForDirectory 获取目录的挂载信息
+func (m *MountFs) getMountForDirectory(dir string) (Mount, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	dir = cleanPath(dir)
+	for _, mount := range m.mounts {
+		if mount.Prefix == dir {
+			return mount, true
+		}
+	}
+
+	return Mount{}, false
+}
+
+func (m *MountFs) getDirectMountsUnder(dir string) []Mount {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	dir = cleanPath(dir)
+	var result []Mount
+
+	for _, mount := range m.mounts {
+		if mount.Prefix == dir {
+			// 跳过当前目录本身的挂载点
+			continue
+		}
+
+		// 检查挂载点是否在当前目录下
+		if strings.HasPrefix(mount.Prefix, dir+"/") {
+			// 计算相对路径
+			rel := strings.TrimPrefix(mount.Prefix, dir)
+			rel = strings.TrimPrefix(rel, "/")
+
+			// 检查是否直接子目录（不包含斜杠）
+			if rel != "" && !strings.Contains(rel, "/") {
+				result = append(result, mount)
+			}
+		}
+	}
+	return result
 }

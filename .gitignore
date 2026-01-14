@@ -3,3 +3,4 @@
 *.tmp
 /build
 project.yaml
+config.local.yaml
