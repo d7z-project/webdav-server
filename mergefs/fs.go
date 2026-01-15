@@ -1,12 +1,14 @@
 package mergefs
 
 import (
+	"cmp"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -39,35 +41,29 @@ func NewMountFs(defaultFs afero.Fs) *MountFs {
 }
 
 // Mount 添加挂载点
-func (m *MountFs) Mount(prefix string, fs afero.Fs) {
+func (m *MountFs) Mount(prefix string, fs afero.Fs) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	// 标准化前缀
-	prefix = strings.TrimSuffix(prefix, "/")
-	if prefix == "" {
-		prefix = "/"
+	prefix = "/" + strings.Trim(prefix, "/")
+	if prefix == "/" {
+		return fmt.Errorf("prefix must not be /")
 	}
-
-	// 移除已存在的相同前缀挂载
-	for i, mount := range m.mounts {
+	for _, mount := range m.mounts {
 		if mount.Prefix == prefix {
-			m.mounts[i].Fs = fs
-			return
+			return fmt.Errorf("mount point %q already exists", prefix)
 		}
 	}
-
-	// 按前缀长度降序排列，确保最长匹配优先
 	m.mounts = append(m.mounts, Mount{Prefix: prefix, Fs: fs})
-	m.sortMounts()
+	slices.SortFunc(m.mounts, func(a, b Mount) int {
+		return -cmp.Compare(a.Prefix, b.Prefix)
+	})
+	return nil
 }
 
-// Unmount 移除挂载点
 func (m *MountFs) Unmount(prefix string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	prefix = strings.TrimSuffix(prefix, "/")
+	prefix = "/" + strings.Trim(prefix, "/")
 	for i, mount := range m.mounts {
 		if mount.Prefix == prefix {
 			m.mounts = append(m.mounts[:i], m.mounts[i+1:]...)
@@ -78,53 +74,28 @@ func (m *MountFs) Unmount(prefix string) bool {
 }
 
 // GetMount 获取指定路径对应的挂载点和相对路径
-func (m *MountFs) GetMount(name string) (afero.Fs, string) {
+func (m *MountFs) GetMount(path string) (afero.Fs, string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	// 清理路径
-	name = cleanPath(name)
-
-	// 查找匹配的挂载点
+	path = cleanPath(path)
+	if path == "/" {
+		return m.defaultFs, path
+	}
 	for _, mount := range m.mounts {
-		if mount.Prefix == "/" {
-			// 根挂载点匹配所有路径
-			return mount.Fs, name
-		}
-
-		if name == mount.Prefix || strings.HasPrefix(name, mount.Prefix+"/") {
-			relPath := strings.TrimPrefix(name, mount.Prefix)
-			if relPath == "" {
-				relPath = "/"
-			} else if !strings.HasPrefix(relPath, "/") {
-				relPath = "/" + relPath
-			}
-			return mount.Fs, relPath
+		if path == mount.Prefix || strings.HasPrefix(path, mount.Prefix+"/") {
+			return mount.Fs, strings.TrimPrefix(path, mount.Prefix)
 		}
 	}
-
-	// 没有匹配的挂载点，使用默认文件系统
-	return m.defaultFs, name
-}
-
-// sortMounts 按前缀长度降序排列挂载点
-func (m *MountFs) sortMounts() {
-	sort.SliceStable(m.mounts, func(i, j int) bool {
-		return len(m.mounts[i].Prefix) > len(m.mounts[j].Prefix)
-	})
+	return m.defaultFs, path
 }
 
 // cleanPath 清理路径
 func cleanPath(p string) string {
-	p = filepath.ToSlash(p)
-	p = path.Clean(p)
+	p = path.Clean(filepath.ToSlash(p))
 	if p == "." {
 		p = "/"
 	}
-	if !strings.HasPrefix(p, "/") {
-		p = "/" + p
-	}
-	return p
+	return "/" + strings.Trim(p, "/")
 }
 
 func (m *MountFs) Create(name string) (afero.File, error) {
@@ -133,10 +104,7 @@ func (m *MountFs) Create(name string) (afero.File, error) {
 }
 
 func (m *MountFs) Mkdir(name string, perm os.FileMode) error {
-	name = cleanPath(name)
-	// 获取挂载信息
-	if _, ok := m.getMountForDirectory(name); ok {
-		// 已经存在挂载点，返回错误
+	if _, ok := m.directDir(name); ok {
 		return &os.PathError{
 			Op:   "mkdir",
 			Path: name,
@@ -148,16 +116,46 @@ func (m *MountFs) Mkdir(name string, perm os.FileMode) error {
 }
 
 func (m *MountFs) MkdirAll(path string, perm os.FileMode) error {
+	if _, ok := m.directDir(path); ok {
+		return &os.PathError{
+			Op:   "mkdir",
+			Path: path,
+			Err:  os.ErrExist,
+		}
+	}
 	mount, relPath := m.GetMount(path)
 	return mount.MkdirAll(relPath, perm)
 }
 
-func (m *MountFs) Remove(name string) error {
-	mount, p := m.GetMount(name)
+func (m *MountFs) Remove(path string) error {
+	// 挂载点无法被删除
+	if _, ok := m.directDir(path); ok {
+		return &os.PathError{
+			Op:   "remove",
+			Path: path,
+			Err:  os.ErrPermission,
+		}
+	}
+	mount, p := m.GetMount(path)
 	return mount.Remove(p)
 }
 
 func (m *MountFs) RemoveAll(path string) error {
+	if _, ok := m.directDir(path); ok {
+		return &os.PathError{
+			Op:   "remove",
+			Path: path,
+			Err:  os.ErrPermission,
+		}
+	}
+	//如果存在子路径挂载则也无法删除
+	if m.hasChildMount(path) {
+		return &os.PathError{
+			Op:   "remove",
+			Path: path,
+			Err:  os.ErrPermission,
+		}
+	}
 	mount, relPath := m.GetMount(path)
 	return mount.RemoveAll(relPath)
 }
@@ -241,7 +239,7 @@ func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst
 
 func (m *MountFs) Stat(name string) (os.FileInfo, error) {
 	name = cleanPath(name)
-	if _, ok := m.getMountForDirectory(name); ok {
+	if _, ok := m.directDir(name); ok {
 		return &mountFileInfo{
 			name: filepath.Base(name),
 			mode: os.ModeDir | 0755,
@@ -296,7 +294,7 @@ func (m *MountFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File,
 		return nil, err
 	}
 	if info.IsDir() {
-		return newMountFsFile(file, m, name, true), nil
+		return newMountFsFile(file, m, name), nil
 	}
 
 	// 普通文件直接返回
@@ -371,19 +369,26 @@ func (m *MountFs) GetMountInfo(name string) (string, afero.Fs, string) {
 	return "/", m.defaultFs, name
 }
 
-// getMountForDirectory 获取目录的挂载信息
-func (m *MountFs) getMountForDirectory(dir string) (Mount, bool) {
+// directDir 获取目录的挂载信息
+func (m *MountFs) directDir(dir string) (Mount, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	dir = cleanPath(dir)
 	for _, mount := range m.mounts {
 		if mount.Prefix == dir {
 			return mount, true
 		}
 	}
-
 	return Mount{}, false
+}
+func (m *MountFs) hasChildMount(dir string) bool {
+	dir = cleanPath(dir) + "/"
+	for _, mount := range m.mounts {
+		if strings.HasPrefix(mount.Prefix, dir) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *MountFs) getDirectMountsUnder(dir string) []Mount {
@@ -398,7 +403,6 @@ func (m *MountFs) getDirectMountsUnder(dir string) []Mount {
 			// 跳过当前目录本身的挂载点
 			continue
 		}
-
 		// 检查挂载点是否在当前目录下
 		if strings.HasPrefix(mount.Prefix, dir+"/") {
 			// 计算相对路径

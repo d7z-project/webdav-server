@@ -20,7 +20,7 @@ type mountFsFile struct {
 }
 
 // newMountFsFile 创建新的 mountFsFile
-func newMountFsFile(file afero.File, fs *MountFs, path string, isDir bool) *mountFsFile {
+func newMountFsFile(file afero.File, fs *MountFs, path string) *mountFsFile {
 	return &mountFsFile{
 		File: file,
 		fs:   fs,
