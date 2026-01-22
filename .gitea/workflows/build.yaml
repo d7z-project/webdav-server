@@ -9,10 +9,10 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
-      - name: Download Resources
-        uses: actions/download@v1
+      - name: Use Mirrors Setup
+        uses: actions/mirrors-setup@v1
       - name: Make Package
-        run:  make server
+        run:  make all
       - name: Download Resources
         uses: actions/download@v1
       - name: Build Package
