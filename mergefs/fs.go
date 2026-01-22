@@ -77,8 +77,9 @@ func (m *MountFs) Unmount(prefix string) bool {
 func (m *MountFs) GetMount(path string) (afero.Fs, string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	path = cleanPath(path)
+	path = NormalizePath(path)
 	if path == "/" {
+		// fmt.Println("DEBUG: GetMount returning defaultFs for /")
 		return m.defaultFs, path
 	}
 	for _, mount := range m.mounts {
@@ -89,8 +90,8 @@ func (m *MountFs) GetMount(path string) (afero.Fs, string) {
 	return m.defaultFs, path
 }
 
-// cleanPath 清理路径
-func cleanPath(p string) string {
+// NormalizePath 清理路径
+func NormalizePath(p string) string {
 	p = path.Clean(filepath.ToSlash(p))
 	if p == "." {
 		p = "/"
@@ -136,6 +137,14 @@ func (m *MountFs) Remove(path string) error {
 			Err:  os.ErrPermission,
 		}
 	}
+	// 如果存在子路径挂载则也无法删除
+	if m.hasChildMount(path) {
+		return &os.PathError{
+			Op:   "remove",
+			Path: path,
+			Err:  fmt.Errorf("directory contains a mount point"),
+		}
+	}
 	mount, p := m.GetMount(path)
 	return mount.Remove(p)
 }
@@ -153,7 +162,7 @@ func (m *MountFs) RemoveAll(path string) error {
 		return &os.PathError{
 			Op:   "remove",
 			Path: path,
-			Err:  os.ErrPermission,
+			Err:  fmt.Errorf("directory contains a mount point"),
 		}
 	}
 	mount, relPath := m.GetMount(path)
@@ -161,6 +170,14 @@ func (m *MountFs) RemoveAll(path string) error {
 }
 
 func (m *MountFs) Rename(oldname, newname string) error {
+	if m.hasChildMount(oldname) {
+		return &os.PathError{
+			Op:   "rename",
+			Path: oldname,
+			Err:  fmt.Errorf("directory contains a mount point"),
+		}
+	}
+
 	oldFs, oldPath := m.GetMount(oldname)
 	newFs, newPath := m.GetMount(newname)
 
@@ -186,19 +203,10 @@ func (m *MountFs) crossRename(srcFs afero.Fs, src string, dstFs afero.Fs, dst st
 	if srcInfo.IsDir() {
 		return m.crossRenameDir(srcFs, src, dstFs, dst)
 	}
-	dstFile, err := dstFs.Create(dst)
+
+	// copy file
+	err = copyFile(srcFs, src, dstFs, dst)
 	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		_ = dstFs.Remove(dst)
-		return err
-	}
-	err = dstFs.Chmod(dst, srcInfo.Mode())
-	if err != nil {
-		_ = dstFs.Remove(dst)
 		return err
 	}
 	return srcFs.Remove(src)
@@ -227,7 +235,7 @@ func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst
 		if info.IsDir() {
 			err = m.crossRenameDir(srcFs, srcPath, dstFs, dstPath)
 		} else {
-			err = m.crossRename(srcFs, srcPath, dstFs, dstPath)
+			err = copyFile(srcFs, srcPath, dstFs, dstPath)
 		}
 
 		if err != nil {
@@ -237,17 +245,78 @@ func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst
 	return srcFs.RemoveAll(src)
 }
 
+func copyFile(srcFs afero.Fs, src string, dstFs afero.Fs, dst string) error {
+	srcFile, err := srcFs.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+	dstFile, err := dstFs.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		_ = dstFs.Remove(dst)
+		return err
+	}
+	srcInfo, err := srcFs.Stat(src)
+	if err != nil {
+		_ = dstFs.Remove(dst)
+		return err
+	}
+	err = dstFs.Chmod(dst, srcInfo.Mode())
+	if err != nil {
+		_ = dstFs.Remove(dst)
+		return err
+	}
+	return nil
+}
+
 func (m *MountFs) Stat(name string) (os.FileInfo, error) {
-	name = cleanPath(name)
-	if _, ok := m.directDir(name); ok {
+	name = NormalizePath(name)
+
+	// 1. Check for direct mount points
+	if mount, ok := m.directDir(name); ok {
 		return &mountFileInfo{
-			name: filepath.Base(name),
-			mode: os.ModeDir | 0755,
+			name:  filepath.Base(name),
+			mode:  os.ModeDir | 0755,
+			mount: &mount,
 		}, nil
 	}
 
+	// 2. Check underlying filesystem
 	mount, p := m.GetMount(name)
-	return mount.Stat(p)
+	info, err := mount.Stat(p)
+	if err == nil {
+		return info, nil
+	}
+	// If the error is not 'IsNotExist', return it immediately
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	// 3. Check for virtual intermediate directories
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, mount := range m.mounts {
+		if strings.HasPrefix(mount.Prefix, name) && mount.Prefix != name {
+			// name is a prefix of a mount point, but not the mount point itself
+
+			// Ensure it is a directory prefix
+			if name == "/" || strings.HasPrefix(mount.Prefix, name+"/") {
+				return &virtualFileInfo{
+					name: filepath.Base(name),
+					mode: os.ModeDir | 0755, // Virtual directories are always directories
+				}, nil
+			}
+		}
+	}
+
+	// If not virtual, return the original error from underlying filesystem
+	return nil, err
 }
 
 func (m *MountFs) Name() string {
@@ -294,7 +363,12 @@ func (m *MountFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File,
 		return nil, err
 	}
 	if info.IsDir() {
-		return newMountFsFile(file, m, name), nil
+		mf, err := newMountFsFile(file, m, name)
+		if err != nil {
+			file.Close()
+			return nil, err
+		}
+		return mf, nil
 	}
 
 	// 普通文件直接返回
@@ -302,6 +376,30 @@ func (m *MountFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File,
 }
 
 func (m *MountFs) Open(name string) (afero.File, error) {
+	name = NormalizePath(name)
+
+	// Check if 'name' is a virtual directory
+	info, err := m.Stat(name)
+	if err == nil && info.IsDir() {
+		_, isVirtual := info.(*virtualFileInfo)
+		if isVirtual {
+			// If it's a virtual directory, create an in-memory FS to represent it
+			memFs := afero.NewMemMapFs()
+			// We need a file handle to pass to newMountFsFile, so open the root of this temporary FS
+			virtualFile, err := memFs.OpenFile("/", os.O_RDONLY, 0)
+			if err != nil {
+				return nil, err
+			}
+			mf, err := newMountFsFile(virtualFile, m, name)
+			if err != nil {
+				virtualFile.Close()
+				return nil, err
+			}
+			return mf, nil
+		}
+	}
+
+	// If not a virtual directory or Stat failed, proceed with normal OpenFile logic
 	return m.OpenFile(name, os.O_RDONLY, 0)
 }
 
@@ -356,7 +454,7 @@ func (m *MountFs) GetMountInfo(name string) (string, afero.Fs, string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	name = cleanPath(name)
+	name = NormalizePath(name)
 	for _, mount := range m.mounts {
 		if name == mount.Prefix || strings.HasPrefix(name, mount.Prefix+"/") {
 			relPath := strings.TrimPrefix(name, mount.Prefix)
@@ -373,7 +471,7 @@ func (m *MountFs) GetMountInfo(name string) (string, afero.Fs, string) {
 func (m *MountFs) directDir(dir string) (Mount, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	dir = cleanPath(dir)
+	dir = NormalizePath(dir)
 	for _, mount := range m.mounts {
 		if mount.Prefix == dir {
 			return mount, true
@@ -382,7 +480,7 @@ func (m *MountFs) directDir(dir string) (Mount, bool) {
 	return Mount{}, false
 }
 func (m *MountFs) hasChildMount(dir string) bool {
-	dir = cleanPath(dir) + "/"
+	dir = NormalizePath(dir) + "/"
 	for _, mount := range m.mounts {
 		if strings.HasPrefix(mount.Prefix, dir) {
 			return true
@@ -391,26 +489,27 @@ func (m *MountFs) hasChildMount(dir string) bool {
 	return false
 }
 
-func (m *MountFs) getDirectMountsUnder(dir string) []Mount {
+func (m *MountFs) getMountsUnder(dir string) []Mount {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	dir = cleanPath(dir)
+	dir = NormalizePath(dir)
 	var result []Mount
 
 	for _, mount := range m.mounts {
+		// 挂载点自身不能作为其子挂载点
 		if mount.Prefix == dir {
-			// 跳过当前目录本身的挂载点
 			continue
 		}
-		// 检查挂载点是否在当前目录下
-		if strings.HasPrefix(mount.Prefix, dir+"/") {
-			// 计算相对路径
-			rel := strings.TrimPrefix(mount.Prefix, dir)
-			rel = strings.TrimPrefix(rel, "/")
 
-			// 检查是否直接子目录（不包含斜杠）
-			if rel != "" && !strings.Contains(rel, "/") {
+		// 检查挂载点是否以当前目录为前缀
+		// 必须确保是真正的子目录 (e.g. /a vs /ab)
+		if dir == "/" {
+			if strings.HasPrefix(mount.Prefix, "/") {
+				result = append(result, mount)
+			}
+		} else {
+			if strings.HasPrefix(mount.Prefix, dir+"/") {
 				result = append(result, mount)
 			}
 		}

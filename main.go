@@ -64,9 +64,9 @@ func main() {
 		<-sig
 	}()
 	osFs := afero.NewOsFs()
-	baseFs := afero.NewMemMapFs()
-	_ = afero.WriteFile(baseFs, "/index.txt", []byte("hello world"), os.ModePerm)
-	rootFs := mergefs.NewMountFs(afero.NewReadOnlyFs(baseFs))
+	baseFS := afero.NewMemMapFs()
+	rootFs := mergefs.NewMountFs(afero.NewReadOnlyFs(baseFS))
+	_ = afero.WriteFile(baseFS, "/index.txt", []byte("hello world"), os.ModePerm)
 	for s, pool := range cfg.Pools {
 		rootFs.Mount(fmt.Sprintf("/%s", s), afero.NewBasePathFs(osFs, pool.Path))
 	}
