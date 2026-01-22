@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>预览 {{ .Path }}</title>
+</head>
+<body>
+<h1 style="display: inline-block"> 预览 {{.Path }}</h1> |
+<h2 style="display: inline-block">欢迎你,{{ .User }}</h2>
+<hr>
+<table>
+    <tr>
+        <th>文件名</th>
+        <th>大小</th>
+        <th>更新时间</th>
+    </tr>
+    <tbody>
+    <tr>
+        <td><a href="../">../</a></td>
+        <td>-</td>
+        <td>-</td>
+    </tr>
+    {{ range .Dirs }}
+        <tr>
+            {{if .IsDir }}
+                <td><a href="./{{.Name}}/">{{.Name}}/</a></td>
+            {{else}}
+                <td><a href="./{{.Name}}">{{.Name}}</a></td>
+            {{end}}
+            <td></td>
+            <td></td>
+        </tr>
+    {{end}}
+    </tbody>
+</table>
+</body>
+</html>

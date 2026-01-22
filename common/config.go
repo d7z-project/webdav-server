@@ -1,0 +1,124 @@
+package common
+
+import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/goccy/go-yaml"
+)
+
+var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+type Config struct {
+	// 绑定端口
+	Bind string `yaml:"bind"`
+	// 映射池
+	Pools map[string]ConfigPool `yaml:"pools"`
+	// 用户表
+	Users map[string]ConfigUser `yaml:"users"`
+
+	Webdav ConfigWebdav `yaml:"webdav"`
+	SFTP   ConfigSFTP   `yaml:"sftp"`
+	NFS    ConfigNFS    `yaml:"nfs"`
+}
+
+type ConfigWebdav struct {
+	Enabled bool   `yaml:"enabled"`
+	Prefix  string `yaml:"prefix"`
+}
+type ConfigSFTP struct {
+	Enabled bool   `yaml:"enabled"`
+	Bind    string `yaml:"bind"`
+}
+type ConfigNFS struct {
+	Enabled bool   `yaml:"enabled"`
+	Bind    string `yaml:"bind"`
+}
+
+type ConfigUser struct {
+	Password  string `yaml:"password"`
+	PublicKey string `yaml:"public_key"`
+}
+
+type ConfigPool struct {
+	Path        string              `yaml:"path"`
+	Permissions map[string]FilePerm `yaml:"permissions"`
+	DefaultPerm FilePerm            `yaml:"permission"`
+}
+
+type FilePerm string
+
+func (p FilePerm) IsRead() bool {
+	return strings.Contains(string(p), "r")
+}
+func (p FilePerm) IsWrite() bool {
+	return p.IsRead() && strings.Contains(string(p), "w")
+}
+
+func LoadConfig(filePath string) (*Config, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var result Config
+	if err = yaml.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+	if result.Bind == "" {
+		return nil, errors.New("bind is required")
+	}
+	if result.Pools == nil || len(result.Pools) == 0 {
+		return nil, errors.New("pools is required")
+	}
+	for name, user := range result.Users {
+		if name == "guest" {
+			return nil, errors.New("guest user is retained")
+		}
+		if !nameRegexp.MatchString(name) {
+			return nil, fmt.Errorf("invalid user name: %s", name)
+		}
+		if user.Password == "" && user.PublicKey == "" {
+			slog.Warn("password or public key is not defined.", "user", name)
+		}
+	}
+	result.Users["guest"] = ConfigUser{
+		Password:  "",
+		PublicKey: "",
+	}
+	for poolName, pool := range result.Pools {
+		if !nameRegexp.MatchString(poolName) {
+			return nil, fmt.Errorf("invalid pool name: %s", poolName)
+		}
+		if pool.Path == "" {
+			return nil, fmt.Errorf("invalid pool path: %s", poolName)
+		}
+		if stat, err := os.Stat(pool.Path); err != nil || !stat.IsDir() {
+			return nil, fmt.Errorf("invalid pool path %s: not exists or not dir", poolName)
+		}
+		if len(pool.Permissions) == 0 && !pool.DefaultPerm.IsRead() {
+			slog.Warn("pool cannot be operated by any user.", "pool", poolName)
+		}
+		for name, permission := range pool.Permissions {
+			if !nameRegexp.MatchString(name) {
+				return nil, fmt.Errorf("invalid pool name: %s", name)
+			}
+			if _, ok := result.Users[name]; !ok {
+				slog.Warn("the user does not exist", "user", name)
+			}
+			if permission == "" {
+				return nil, fmt.Errorf("invalid permission (%s/%s)", poolName, name)
+			}
+		}
+	}
+	if result.Webdav.Enabled {
+		result.Webdav.Prefix = "/" + strings.TrimSpace(strings.Trim(result.Webdav.Prefix, "/"))
+		if result.Webdav.Prefix == "/" {
+			return nil, errors.New("webdav not support prefix '/' or empty")
+		}
+	}
+	return &result, nil
+}

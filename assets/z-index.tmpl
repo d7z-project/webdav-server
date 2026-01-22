@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta
+            name="viewport"
+            content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>简易的文件服务器</title>
+</head>
+<body>
+<h1>简易的文件服务器</h1>
+<hr>
+<p>访问 <a href="/preview/">/preview</a> 来预览文件.</p>
+{{if .Config.Webdav.Enabled }}
+    <p>添加 <code id="webdav"></code> 来访问 webdav</p>
+    <script>
+        document.getElementById("webdav").innerHTML = `webdav://${location.host}{{ .Config.Webdav.Prefix }}`
+    </script>
+{{end}}
+</body>
+</html>
