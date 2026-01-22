@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/inhies/go-bytesize"
 )
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -21,9 +22,10 @@ type Config struct {
 	// 用户表
 	Users map[string]ConfigUser `yaml:"users"`
 
-	Webdav ConfigWebdav `yaml:"webdav"`
-	SFTP   ConfigSFTP   `yaml:"sftp"`
-	NFS    ConfigNFS    `yaml:"nfs"`
+	Webdav  ConfigWebdav  `yaml:"webdav"`
+	SFTP    ConfigSFTP    `yaml:"sftp"`
+	NFS     ConfigNFS     `yaml:"nfs"`
+	Preview ConfigPreview `yaml:"preview"`
 }
 
 type ConfigWebdav struct {
@@ -37,6 +39,25 @@ type ConfigSFTP struct {
 type ConfigNFS struct {
 	Enabled bool   `yaml:"enabled"`
 	Bind    string `yaml:"bind"`
+}
+
+type FileSize uint64
+
+func (f *FileSize) UnmarshalYAML(dt []byte) error {
+	var s string
+	if err := yaml.Unmarshal(dt, &s); err != nil {
+		return err
+	}
+	parse, err := bytesize.Parse(s)
+	if err != nil {
+		return err
+	}
+	*f = FileSize(parse)
+	return nil
+}
+
+type ConfigPreview struct {
+	MaxUploadSize FileSize `yaml:"max_upload_size"`
 }
 
 type ConfigUser struct {
@@ -55,6 +76,7 @@ type FilePerm string
 func (p FilePerm) IsRead() bool {
 	return strings.Contains(string(p), "r")
 }
+
 func (p FilePerm) IsWrite() bool {
 	return p.IsRead() && strings.Contains(string(p), "w")
 }
@@ -115,10 +137,16 @@ func LoadConfig(filePath string) (*Config, error) {
 		}
 	}
 	if result.Webdav.Enabled {
+		if result.Webdav.Prefix == "" {
+			result.Webdav.Prefix = "/dav"
+		}
 		result.Webdav.Prefix = "/" + strings.TrimSpace(strings.Trim(result.Webdav.Prefix, "/"))
 		if result.Webdav.Prefix == "/" {
 			return nil, errors.New("webdav not support prefix '/' or empty")
 		}
+	}
+	if result.Preview.MaxUploadSize == 0 {
+		result.Preview.MaxUploadSize = 1024 * 1024 * 1024
 	}
 	return &result, nil
 }

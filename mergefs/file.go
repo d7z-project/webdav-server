@@ -6,7 +6,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/afero"
@@ -20,7 +19,6 @@ type mountFsFile struct {
 	path    string   // 文件或目录在 MountFs 中的完整路径
 	offset  int      // 用于 Readdir/Readdirnames 的读取偏移量
 	entries []fs.DirEntry
-	mu      sync.Mutex
 }
 
 // newMountFsFile 创建并返回一个新的 mountFsFile 实例。
@@ -44,6 +42,9 @@ func newMountFsFile(file afero.File, fs *MountFs, path string) (*mountFsFile, er
 func (f *mountFsFile) Readdir(count int) ([]os.FileInfo, error) {
 	// 如果已经读完所有条目
 	if f.offset >= len(f.entries) { // Use f.entries directly
+		if count <= 0 {
+			return []os.FileInfo{}, nil
+		}
 		return nil, io.EOF
 	}
 
@@ -78,6 +79,9 @@ func (f *mountFsFile) Readdir(count int) ([]os.FileInfo, error) {
 func (f *mountFsFile) Readdirnames(count int) ([]string, error) {
 	// 如果已经读完所有条目
 	if f.offset >= len(f.entries) { // Use f.entries directly
+		if count <= 0 {
+			return []string{}, nil
+		}
 		return nil, io.EOF
 	}
 
@@ -145,14 +149,14 @@ func (f *mountFsFile) collectEntries() ([]fs.DirEntry, error) {
 			// 直接挂载点优先级最高，总是覆盖
 			entryMap[name] = &mountDirEntry{
 				name:  name,
-				mode:  os.ModeDir | 0755,
+				mode:  os.ModeDir | 0o755,
 				mount: &mount,
 			}
 		} else if !exists {
 			// 虚拟目录，仅当不存在时添加
 			entryMap[name] = &dirEntry{info: &virtualFileInfo{
 				name: name,
-				mode: os.ModeDir | 0755,
+				mode: os.ModeDir | 0o755,
 			}}
 		}
 	}
@@ -220,6 +224,7 @@ func (m *mountDirEntry) Type() fs.FileMode          { return m.mode.Type() }
 func (m *mountDirEntry) Info() (os.FileInfo, error) { return m, nil }
 func (m *mountDirEntry) Size() int64                { return 0 } // 挂载点目录大小通常为 0 或 4096，这里简化为 0
 func (m *mountDirEntry) Mode() os.FileMode          { return m.mode }
+
 func (m *mountDirEntry) ModTime() time.Time {
 	// 尝试获取挂载的根文件系统 "/" 的修改时间
 	if m.mount != nil {
@@ -250,6 +255,7 @@ func (m *mountFileInfo) Mode() os.FileMode {
 	}
 	return m.mode
 }
+
 func (m *mountFileInfo) ModTime() time.Time {
 	// 尝试获取挂载的根文件系统 "/" 的修改时间
 	if m.mount != nil {

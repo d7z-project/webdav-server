@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>/{{ .Path }}</title>
+    <style>
+        /* 核心配色：使用 CSS 变量定义 */
+        :root {
+            --c-blue: #007aff;
+            --c-bg: #f5f5f7;
+            --c-card: #ffffff;
+            --c-text: #1d1d1f;
+            --c-sub: #86868b;
+            --c-border: #e1e4e8;
+            --c-hover: #f5f5f7;
+            --c-th: #fafafa;
+            --c-mask: rgba(255, 255, 255, 0.8);
+        }
+
+        /* 暗色模式自动适配 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --c-blue: #0a84ff;
+                --c-bg: #000000;
+                --c-card: #1c1c1e;
+                --c-text: #f5f5f7;
+                --c-sub: #86868b;
+                --c-border: #38383a;
+                --c-hover: #2c2c2e;
+                --c-th: #2c2c2e;
+                --c-mask: rgba(0, 0, 0, 0.8);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: var(--c-bg);
+            color: var(--c-text);
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* 头部 */
+        .header {
+            background: var(--c-card);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--c-border);
+            flex-wrap: wrap;
+        }
+
+        .nav {
+            font-size: 15px;
+        }
+
+        .nav a {
+            color: var(--c-blue);
+            font-weight: 500;
+        }
+
+        .nav span {
+            color: var(--c-sub);
+            margin: 0 5px;
+        }
+
+        /* 用户与按钮区 */
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-txt {
+            font-size: 13px;
+            color: var(--c-sub);
+        }
+
+        .user-txt b {
+            color: var(--c-text);
+        }
+
+        .btn {
+            background: var(--c-blue);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* 列表 */
+        .list {
+            background: var(--c-card);
+            border-radius: 10px;
+            border: 1px solid var(--c-border);
+            overflow: hidden;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 20px;
+            background: var(--c-th);
+            font-size: 13px;
+            color: var(--c-sub);
+            border-bottom: 1px solid var(--c-border);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--c-border);
+            font-size: 14px;
+            color: var(--c-text);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--c-hover);
+            cursor: pointer;
+        }
+
+        .name-col {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .name-col a {
+            color: var(--c-text);
+            flex: 1;
+            word-break: break-all;
+        }
+
+        tr:hover .name-col a {
+            color: var(--c-blue);
+        }
+
+        .meta {
+            color: var(--c-sub);
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        /* 图标 */
+        .ico {
+            width: 20px;
+            height: 20px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            flex-shrink: 0;
+        }
+
+        .i-dir {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fbc02d'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E");
+        }
+
+        /* 文件图标使用灰色，在深色背景也清晰 */
+        .i-file {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239e9e9e'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z'/%3E%3C/svg%3E");
+        }
+
+        .i-up {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23007aff'%3E%3Cpath d='M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z'/%3E%3C/svg%3E");
+        }
+
+        /* 遮罩与弹窗 */
+        #drag-mask {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--c-blue);
+            opacity: 0.9;
+            z-index: 99;
+            color: #fff;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #progress-box {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .p-card {
+            background: var(--c-card);
+            padding: 25px;
+            border-radius: 12px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--c-border);
+        }
+
+        .p-card h3 {
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: var(--c-text);
+        }
+
+        .p-bar-bg {
+            background: var(--c-border);
+            height: 6px;
+            border-radius: 3px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .p-bar {
+            height: 100%;
+            background: var(--c-blue);
+            width: 0%;
+            transition: width 0.2s;
+        }
+
+        #p-txt {
+            color: var(--c-sub);
+            font-size: 13px;
+        }
+
+        @media (max-width: 600px) {
+            .meta {
+                display: none;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .actions {
+                justify-content: space-between;
+                border-top: 1px solid var(--c-border);
+                padding-top: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="drag-mask">释放文件以上传</div>
+
+<div id="progress-box">
+    <div class="p-card">
+        <h3>正在上传</h3>
+        <div class="p-bar-bg">
+            <div class="p-bar" id="bar"></div>
+        </div>
+        <div id="p-txt">0%</div>
+    </div>
+</div>
+
+<input type="file" id="f-input" style="display:none">
+
+<div class="header">
+    <div class="nav">
+        <a href="/">首页</a>
+        {{ $pathParts := split .Path "/" }}{{ $cp := "" }}
+        {{ range $part := $pathParts }}{{ if $part }}
+            <span> - </span>{{ $cp = printf "%s/%s" $cp $part }}<a href="{{ $cp }}">{{ $part }}</a>
+        {{ end }}{{ end }}
+    </div>
+
+    <div class="actions">
+        <span class="user-txt">用户: <b>{{ .User }}</b></span>
+        <button class="btn" onclick="document.getElementById('f-input').click()">+ 上传文件</button>
+    </div>
+</div>
+
+<table class="list">
+    <thead>
+    <tr>
+        <th>文件名</th>
+        <th width="100" class="meta">大小</th>
+        <th width="160" class="meta">时间</th>
+    </tr>
+    </thead>
+    <tbody>
+    {{ if ne .Path "" }}
+        <tr onclick="location.href='../'">
+            <td>
+                <div class="name-col"><i class="ico i-up"></i><a href="../">上级目录</a></div>
+            </td>
+            <td class="meta">-</td>
+            <td class="meta">-</td>
+        </tr>
+    {{ end }}
+    {{ range .Dirs }}
+        <tr data-url="{{if .IsDir}}./{{.Name}}/{{else}}./{{.Name}}{{end}}">
+            <td>
+                <div class="name-col">
+                    <i class="ico {{if .IsDir}}i-dir{{else}}i-file{{end}}"></i>
+                    <a href="{{if .IsDir}}./{{.Name}}/{{else}}./{{.Name}}{{end}}">{{.Name}}</a>
+                </div>
+            </td>
+            <td class="meta">{{if .IsDir}}-{{else}}{{ Bytesize .Size }}{{end}}</td>
+            <td class="meta">{{ .ModTime.Format "2006-01-02 15:04" }}</td>
+        </tr>
+    {{ end }}
+    </tbody>
+</table>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 列表点击跳转
+        document.querySelectorAll('tr[data-url]').forEach(tr => {
+            tr.addEventListener('click', e => {
+                if (e.target.tagName !== 'A') location.href = tr.dataset.url;
+            });
+        });
+
+        const mask = document.getElementById('drag-mask');
+        const pBox = document.getElementById('progress-box');
+        const pBar = document.getElementById('bar');
+        const pTxt = document.getElementById('p-txt');
+        const input = document.getElementById('f-input');
+        let dragCount = 0;
+
+        // 拖拽
+        window.addEventListener('dragenter', e => {
+            e.preventDefault();
+            dragCount++;
+            mask.style.display = 'flex';
+        });
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('dragleave', () => {
+            dragCount--;
+            if (dragCount === 0) mask.style.display = 'none';
+        });
+        window.addEventListener('drop', e => {
+            e.preventDefault();
+            dragCount = 0;
+            mask.style.display = 'none';
+            if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+        });
+
+        // 点击选择
+        input.addEventListener('change', function () {
+            if (this.files.length) upload(this.files[0]);
+        });
+
+        // 上传函数
+        function upload(file) {
+            pBox.style.display = 'flex';
+            pBar.style.width = '0%';
+            pTxt.innerText = '0%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', location.href, true);
+
+            xhr.upload.onprogress = e => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100) + '%';
+                    pBar.style.width = pct;
+                    pTxt.innerText = pct;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status < 300) location.reload();
+                else {
+                    alert('失败: ' + xhr.status);
+                    pBox.style.display = 'none';
+                }
+            };
+
+            xhr.onerror = () => {
+                alert('网络错误');
+                pBox.style.display = 'none';
+            };
+
+            const fd = new FormData();
+            fd.append('file', file);
+            xhr.send(fd);
+            input.value = '';
+        }
+    });
+</script>
+</body>
+</html>

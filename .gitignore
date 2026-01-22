@@ -4,3 +4,4 @@
 /build
 project.yaml
 config.local.yaml
+server-linux-*

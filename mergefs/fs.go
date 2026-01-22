@@ -157,7 +157,7 @@ func (m *MountFs) RemoveAll(path string) error {
 			Err:  os.ErrPermission,
 		}
 	}
-	//如果存在子路径挂载则也无法删除
+	// 如果存在子路径挂载则也无法删除
 	if m.hasChildMount(path) {
 		return &os.PathError{
 			Op:   "remove",
@@ -214,7 +214,7 @@ func (m *MountFs) crossRename(srcFs afero.Fs, src string, dstFs afero.Fs, dst st
 
 func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst string) error {
 	// 创建目标目录
-	err := dstFs.MkdirAll(dst, 0755)
+	err := dstFs.MkdirAll(dst, 0o755)
 	if err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func (m *MountFs) Stat(name string) (os.FileInfo, error) {
 	if mount, ok := m.directDir(name); ok {
 		return &mountFileInfo{
 			name:  filepath.Base(name),
-			mode:  os.ModeDir | 0755,
+			mode:  os.ModeDir | 0o755,
 			mount: &mount,
 		}, nil
 	}
@@ -309,7 +309,7 @@ func (m *MountFs) Stat(name string) (os.FileInfo, error) {
 			if name == "/" || strings.HasPrefix(mount.Prefix, name+"/") {
 				return &virtualFileInfo{
 					name: filepath.Base(name),
-					mode: os.ModeDir | 0755, // Virtual directories are always directories
+					mode: os.ModeDir | 0o755, // Virtual directories are always directories
 				}, nil
 			}
 		}
@@ -479,6 +479,7 @@ func (m *MountFs) directDir(dir string) (Mount, bool) {
 	}
 	return Mount{}, false
 }
+
 func (m *MountFs) hasChildMount(dir string) bool {
 	dir = NormalizePath(dir) + "/"
 	for _, mount := range m.mounts {

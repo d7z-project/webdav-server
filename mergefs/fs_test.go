@@ -48,7 +48,7 @@ func TestMountFs_MkdirAndStat(t *testing.T) {
 	_ = mountFs.Mount("/mounted", mountedFs)
 
 	// 在默认文件系统上创建目录
-	err := mountFs.Mkdir("/dir1", 0755)
+	err := mountFs.Mkdir("/dir1", 0o755)
 	assert.NoError(t, err, "在默认文件系统上创建目录不应出错")
 
 	// 验证目录是否存在
@@ -57,7 +57,7 @@ func TestMountFs_MkdirAndStat(t *testing.T) {
 	assert.True(t, info.IsDir(), "应为目录")
 
 	// 在挂载的文件系统上创建目录
-	err = mountFs.Mkdir("/mounted/dir2", 0755)
+	err = mountFs.Mkdir("/mounted/dir2", 0o755)
 	assert.NoError(t, err, "在挂载的文件系统上创建目录不应出错")
 
 	// 验证目录是否存在
@@ -66,7 +66,7 @@ func TestMountFs_MkdirAndStat(t *testing.T) {
 	assert.True(t, info.IsDir(), "应为目录")
 
 	// 试图创建已存在的目录
-	err = mountFs.Mkdir("/dir1", 0755)
+	err = mountFs.Mkdir("/dir1", 0o755)
 	assert.Error(t, err, "试图创建已存在的目录应出错")
 	assert.True(t, os.IsExist(err), "错误应为 os.ErrExist")
 
@@ -116,13 +116,13 @@ func TestMountFs_CreateAndRemove(t *testing.T) {
 
 func TestMountFs_Readdir(t *testing.T) {
 	defaultFs := afero.NewMemMapFs()
-	_ = defaultFs.Mkdir("/dir_in_default", 0755)
+	_ = defaultFs.Mkdir("/dir_in_default", 0o755)
 	_, _ = defaultFs.Create("/file_in_default.txt")
 
 	mountFs := NewMountFs(defaultFs)
 
 	mountedFs1 := afero.NewMemMapFs()
-	_ = mountedFs1.Mkdir("/dir_in_mounted1", 0755)
+	_ = mountedFs1.Mkdir("/dir_in_mounted1", 0o755)
 	_, _ = mountedFs1.Create("/file_in_mounted1.txt")
 	_ = mountFs.Mount("/mount1", mountedFs1)
 
@@ -165,7 +165,7 @@ func TestMountFs_Readdir(t *testing.T) {
 func TestMountFs_Rename(t *testing.T) {
 	defaultFs := afero.NewMemMapFs()
 	_, _ = defaultFs.Create("/file1.txt")
-	_ = defaultFs.MkdirAll("/src/sub", 0755)
+	_ = defaultFs.MkdirAll("/src/sub", 0o755)
 	_, _ = defaultFs.Create("/src/sub/file.txt")
 
 	mountFs := NewMountFs(defaultFs)
@@ -196,6 +196,7 @@ func TestMountFs_Rename(t *testing.T) {
 	_, err = mountFs.Stat("/mounted/dest/sub/file.txt")
 	assert.NoError(t, err, "目录内容应被移动")
 }
+
 func TestMountFs_OpenFile(t *testing.T) {
 	// Setup
 	defaultFs := afero.NewMemMapFs()
@@ -204,7 +205,7 @@ func TestMountFs_OpenFile(t *testing.T) {
 	assert.NoError(t, mountFs.Mount("/mounted", mountedFs))
 	_, err := defaultFs.Create("/test.txt")
 	assert.NoError(t, err)
-	assert.NoError(t, mountedFs.Mkdir("/dir", 0755))
+	assert.NoError(t, mountedFs.Mkdir("/dir", 0o755))
 
 	// Test opening a file from the default FS
 	file, err := mountFs.OpenFile("/test.txt", os.O_RDONLY, 0)
@@ -226,6 +227,7 @@ func TestMountFs_OpenFile(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, os.IsNotExist(err))
 }
+
 func TestMountFs_RemoveAll(t *testing.T) {
 	// Setup
 	defaultFs := afero.NewMemMapFs()
@@ -233,7 +235,7 @@ func TestMountFs_RemoveAll(t *testing.T) {
 	mountedFs := afero.NewMemMapFs()
 	assert.NoError(t, mountFs.Mount("/mounted", mountedFs))
 	assert.NoError(t, mountFs.Mount("/mounted/sub", afero.NewMemMapFs()))
-	assert.NoError(t, defaultFs.MkdirAll("/a/b/c", 0755))
+	assert.NoError(t, defaultFs.MkdirAll("/a/b/c", 0o755))
 
 	// Test removing a directory with a mount point under it
 	err := mountFs.RemoveAll("/mounted")
@@ -249,8 +251,8 @@ func TestMountFs_RemoveAll(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = mountFs.Stat("/a")
 	assert.True(t, os.IsNotExist(err))
-
 }
+
 func TestMountFs_Unmount(t *testing.T) {
 	// Setup
 	defaultFs := afero.NewMemMapFs()
@@ -279,7 +281,7 @@ func TestMountFs_NestedMount(t *testing.T) {
 
 	// Mount a filesystem at a nested path
 	mountedFs := afero.NewMemMapFs()
-	_ = mountedFs.Mkdir("/testdir", 0755)
+	_ = mountedFs.Mkdir("/testdir", 0o755)
 	err := mountFs.Mount("/path/to/alice", mountedFs)
 	assert.NoError(t, err)
 
@@ -324,4 +326,12 @@ func TestMountFs_NestedMount(t *testing.T) {
 	aliceEntries, err := aliceDir.Readdirnames(0)
 	assert.NoError(t, err)
 	assert.Contains(t, aliceEntries, "testdir")
+}
+
+func TestEmptyDir(t *testing.T) {
+	defaultFs := afero.NewMemMapFs()
+	_ = defaultFs.MkdirAll("/testdir/data", 0o755)
+	dir, err := afero.ReadDir(defaultFs, "/testdir/data")
+	assert.NoError(t, err)
+	assert.Empty(t, dir)
 }

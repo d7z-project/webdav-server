@@ -1,11 +1,12 @@
 package mergefs
 
 import (
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMountFsFile_Readdir(t *testing.T) {
@@ -14,7 +15,7 @@ func TestMountFsFile_Readdir(t *testing.T) {
 	mountFs := NewMountFs(defaultFs)
 
 	// Create some files and directories in the default FS
-	_ = defaultFs.Mkdir("/dir1", 0755)
+	_ = defaultFs.Mkdir("/dir1", 0o755)
 	_, _ = defaultFs.Create("/file1.txt")
 
 	// Create a mounted FS
@@ -85,7 +86,7 @@ func TestMountFsFile_Readdirnames(t *testing.T) {
 	// Setup
 	defaultFs := afero.NewMemMapFs()
 	mountFs := NewMountFs(defaultFs)
-	_ = defaultFs.Mkdir("/dir1", 0755)
+	_ = defaultFs.Mkdir("/dir1", 0o755)
 	_, _ = defaultFs.Create("/file1.txt")
 	mountedFs := afero.NewMemMapFs()
 	_ = mountFs.Mount("/mounted", mountedFs) // Mount an empty filesystem at /mounted
@@ -128,7 +129,7 @@ func TestMountFsFile_Readdirnames(t *testing.T) {
 func TestMountFsFile_Seek(t *testing.T) {
 	defaultFs := afero.NewMemMapFs()
 	mountFs := NewMountFs(defaultFs)
-	_ = defaultFs.Mkdir("/dir", 0755)
+	_ = defaultFs.Mkdir("/dir", 0o755)
 	file, err := mountFs.Open("/dir")
 	assert.NoError(t, err)
 	defer file.Close()
@@ -149,6 +150,7 @@ func TestMountFsFile_Seek(t *testing.T) {
 	assert.NoError(t, err) // Should succeed even if it does nothing
 	assert.Equal(t, int64(0), n)
 }
+
 func TestDirEntry(t *testing.T) {
 	info, _ := afero.NewMemMapFs().Create("test")
 	defer info.Close()
@@ -167,7 +169,7 @@ func TestMountDirEntry(t *testing.T) {
 	mount := &Mount{Prefix: "/m", Fs: afero.NewMemMapFs()}
 	entry := &mountDirEntry{
 		name:  "test",
-		mode:  os.ModeDir | 0755,
+		mode:  os.ModeDir | 0o755,
 		mount: mount,
 	}
 
@@ -175,7 +177,7 @@ func TestMountDirEntry(t *testing.T) {
 	assert.True(t, entry.IsDir())
 	assert.Equal(t, os.ModeDir, entry.Type())
 	assert.Equal(t, int64(0), entry.Size())
-	assert.Equal(t, os.ModeDir|os.FileMode(0755), entry.Mode())
+	assert.Equal(t, os.ModeDir|os.FileMode(0o755), entry.Mode())
 	assert.False(t, entry.ModTime().IsZero())
 
 	info, err := entry.Info()

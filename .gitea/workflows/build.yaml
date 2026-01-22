@@ -1,14 +1,18 @@
 name: Package Build
-#on:
-#  push:
-#    branches:
-#      - main
+on:
+  push:
+    branches:
+      - main
 jobs:
   packages:
     runs-on: "rocky-amd64"
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
+      - name: Download Resources
+        uses: actions/download@v1
+      - name: Make Package
+        run:  make server
       - name: Download Resources
         uses: actions/download@v1
       - name: Build Package

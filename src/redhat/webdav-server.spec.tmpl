@@ -5,10 +5,19 @@ Version:        {{ .metadata.version }}
 Release:        {{ default 1 .metadata.release | toString }}%{?dist}
 Summary:        简单的 Webdav 服务器
 License:        Apache2.0
-URL:            https://code.d7z.net/packages/webdav-server
-Source0:        webdav-server
+URL:            https://code.d7z.net/packages/%{name}
 
-Source100:      webdav-server.service
+%ifarch aarch64
+Source0:        %{name}-arm64
+%endif
+%ifarch x86_64
+Source0:        %{name}-amd64
+%endif
+
+Source1:        config.yaml
+Source2:        %{name}.service
+
+Source100:      %{name}.service
 Source201:      sysusersd.conf
 Source202:      tmpfiles.conf
 
@@ -16,12 +25,17 @@ Source202:      tmpfiles.conf
 简单的 Webdav 服务器
 
 %install
-install -Dm0755 ${S:0} %{buildroot}%{_bindir}/webdav-server
+install -Dm0755 %{S:0} %{buildroot}%{_bindir}/%{name}
+%{__install} -Dm0644 %{S:1} %{buildroot}%{_sysconfdir}/%{name}/config.yaml
+%{__install} -Dm0644 %{S:2} %{buildroot}%{_unitdir}/%{name}.service
 %{__install} -Dm0644 %{SOURCE201} %{buildroot}%{_sysusersdir}/%{name}.conf
 %{__install} -Dm0644 %{SOURCE202} %{buildroot}%{_tmpfilesdir}/%{name}.conf
 
 
 %files
+%config(noreplace) %{_sysconfdir}/%{name}/config.yaml
+%{_unitdir}/%{name}.service
+%{_bindir}/%{name}
 %{_tmpfilesdir}/%{name}.conf
 %{_sysusersdir}/%{name}.conf
 
@@ -29,5 +43,13 @@ install -Dm0755 ${S:0} %{buildroot}%{_bindir}/webdav-server
 %pre
 %sysusers_create_compat %{SOURCE201}
 
+%post
+%systemd_post %{name}.service
+
+%preun
+%systemd_preun %{name}.service
+
+%postun
+%systemd_postun_with_restart %{name}.service
 
 %changelog

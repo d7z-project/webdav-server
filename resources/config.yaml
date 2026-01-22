@@ -1,0 +1,13 @@
+bind: 127.0.0.1:8080
+users:
+  admin:
+    password: 123456
+pools:
+  data:
+    path: /var/lib/webdav-server
+    permissions:
+      admin: rw
+    permission: r
+webdav:
+  enabled: true
+  prefix: /dav
