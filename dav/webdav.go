@@ -11,9 +11,12 @@ import (
 )
 
 func init() {
+	chi.RegisterMethod("SEARCH")
+	chi.RegisterMethod("REPORT")
 	chi.RegisterMethod("PROPFIND")
 	chi.RegisterMethod("PROPPATCH")
 	chi.RegisterMethod("MKOL")
+	chi.RegisterMethod("MKCOL")
 	chi.RegisterMethod("COPY")
 	chi.RegisterMethod("MOVE")
 	chi.RegisterMethod("LOCK")
