@@ -8,7 +8,8 @@ ExecStart=/usr/bin/webdav-server -config /etc/webdav-server/config.yaml
 Restart=always
 User=webdav-server
 Group=webdav-server
-WorkingDirectory=/var/lib/webdav
+WorkingDirectory=/var/lib/webdav-server
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
