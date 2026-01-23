@@ -84,6 +84,31 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 					return
 				}
+
+				if r.URL.Query().Has("mkdir") {
+					if err := r.ParseForm(); err != nil {
+						http.Error(w, "参数错误", http.StatusBadRequest)
+						return
+					}
+					name := r.FormValue("name")
+					if name == "" || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+						http.Error(w, "名称非法", http.StatusBadRequest)
+						return
+					}
+					target := filepath.Join(p, name)
+					if _, err := fs.Stat(target); err == nil {
+						http.Error(w, "目录已存在", http.StatusConflict)
+						return
+					}
+					if err := fs.Mkdir(target, os.ModePerm); err != nil {
+						slog.Warn("mkdir failed", "err", err)
+						http.Error(w, "创建失败: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusCreated)
+					return
+				}
+
 				r.Body = http.MaxBytesReader(w, r.Body, int64(ctx.Config.Preview.MaxUploadSize))
 				if err = r.ParseMultipartForm(10 << 20); err != nil {
 					http.Error(w, "文件过大或解析错误", http.StatusRequestEntityTooLarge)
