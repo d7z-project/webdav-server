@@ -89,7 +89,7 @@ func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, g
 	}
 	if password != "" {
 		if user.Password != password {
-			return nil, errors.Wrapf(NoAuthorizedError, "user %s password not allowed", user)
+			return nil, errors.Wrapf(NoAuthorizedError, "user %s password not allowed", username)
 		}
 	}
 

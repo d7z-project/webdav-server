@@ -48,8 +48,9 @@ func main() {
 	go func() {
 		defer cancel()
 		sig := make(chan os.Signal, 1)
-		defer close(sig)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(sig)
+		defer close(sig)
 		<-sig
 	}()
 	ctx, err := common.NewContext(osCtx, cfg)

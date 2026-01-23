@@ -22,7 +22,7 @@ func NewSFTPServer(ctx *common.FsContext) (*SFTPServer, error) {
 			_, err := ctx.LoadFS(conn.User(), string(password), nil, false)
 			if err != nil {
 				slog.Warn("|security| Login failed.", "mode", "password",
-					"remote", conn.RemoteAddr().String(), "user", conn.User(), "key", string(password))
+					"remote", conn.RemoteAddr().String(), "user", conn.User())
 				return nil, err
 			}
 			return nil, nil

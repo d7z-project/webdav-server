@@ -10,6 +10,9 @@ User=webdav-server
 Group=webdav-server
 WorkingDirectory=/var/lib/webdav-server
 Restart=always
+LimitNOFILE=1048576
+LimitNPROC=512
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target

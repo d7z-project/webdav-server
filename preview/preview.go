@@ -22,6 +22,11 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 			r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 				fs, err := ctx.LoadWebFS(r, true)
 				if err != nil {
+					username, _, _ := r.BasicAuth()
+					if username == "" {
+						username = "guest"
+					}
+					slog.Warn("|security| Login failed.", "source", "preview", "remote", r.RemoteAddr, "user", username, "err", err)
 					if errors.Is(err, common.NoAuthorizedError) {
 						w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 						http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -71,6 +76,11 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 				p := strings.TrimPrefix(r.URL.Path, "/preview")
 				fs, err := ctx.LoadWebFS(r, false)
 				if err != nil {
+					username, _, _ := r.BasicAuth()
+					if username == "" {
+						username = "guest"
+					}
+					slog.Warn("|security| Login failed.", "source", "preview_upload", "remote", r.RemoteAddr, "user", username, "err", err)
 					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 					return
 				}
@@ -95,7 +105,7 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 						return
 					}
 					if !override {
-						http.Error(w, "目录无法上传内容", http.StatusBadRequest)
+						http.Error(w, "文件已存在", http.StatusBadRequest)
 						return
 					}
 				}

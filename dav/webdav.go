@@ -29,6 +29,12 @@ func WithWebdav(ctx *common.FsContext) func(r chi.Router) {
 		r.HandleFunc("/*", func(writer http.ResponseWriter, request *http.Request) {
 			loadFS, err := ctx.LoadWebFS(request, false)
 			if err != nil {
+				username, _, _ := request.BasicAuth()
+				if username == "" {
+					username = "guest"
+				}
+				slog.Warn("|security| Login failed.", "source", "webdav", "remote", request.RemoteAddr, "user", username, "err", err)
+
 				slog.Debug("no authorized filesystem", "err", err.Error())
 				if errors.Is(err, common.NoAuthorizedError) {
 					writer.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
