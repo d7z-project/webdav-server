@@ -18,15 +18,6 @@ type SFTPServer struct {
 
 func NewSFTPServer(ctx *common.FsContext) (*SFTPServer, error) {
 	config := &ssh.ServerConfig{
-		PasswordCallback: func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-			_, err := ctx.LoadFS(conn.User(), string(password), nil, false)
-			if err != nil {
-				slog.Warn("|security| Login failed.", "mode", "password",
-					"remote", conn.RemoteAddr().String(), "user", conn.User())
-				return nil, err
-			}
-			return nil, nil
-		},
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			_, err := ctx.LoadFS(conn.User(), "", key, false)
 			if err != nil {
@@ -36,6 +27,17 @@ func NewSFTPServer(ctx *common.FsContext) (*SFTPServer, error) {
 			}
 			return nil, nil
 		},
+	}
+	if ctx.Config.SFTP.PasswordAuth {
+		config.PasswordCallback = func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+			_, err := ctx.LoadFS(conn.User(), string(password), nil, false)
+			if err != nil {
+				slog.Warn("|security| Login failed.", "mode", "password",
+					"remote", conn.RemoteAddr().String(), "user", conn.User())
+				return nil, err
+			}
+			return nil, nil
+		}
 	}
 	for i, privatekey := range ctx.Config.SFTP.Privatekeys {
 		key, err := ssh.ParsePrivateKey([]byte(privatekey))
