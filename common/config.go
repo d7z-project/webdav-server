@@ -37,6 +37,7 @@ type ConfigSFTP struct {
 	Bind           string   `yaml:"bind"`
 	Privatekeys    []string `yaml:"private_keys"`
 	WelcomeMessage string   `yaml:"welcome_message"`
+	PasswordAuth   bool     `yaml:"password_auth"`
 }
 
 type FileSize uint64
@@ -156,7 +157,7 @@ func LoadConfig(filePath string) (*Config, error) {
 	}
 	if result.SFTP.Enabled {
 		if len(result.SFTP.Privatekeys) == 0 {
-			return nil, errors.New("sftp need support private key , e.g. ssh-keygen -t rsa -f id_rsa -N ''")
+			return nil, errors.New("sftp need ssh host private key , e.g. ssh-keygen -t rsa -f id_rsa -N ''")
 		}
 		for i, item := range result.SFTP.Privatekeys {
 			if !strings.HasPrefix(item, "-----BEGIN OPENSSH PRIVATE KEY-----") {

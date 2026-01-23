@@ -70,9 +70,9 @@ type AuthFS struct {
 	afero.Fs
 }
 
-func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, guest bool) (*AuthFS, error) {
+func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, guestAccept bool) (*AuthFS, error) {
 	if username == "guest" {
-		if !guest {
+		if !guestAccept {
 			return nil, errors.Wrapf(NoPermissionError, "guest not allowed")
 		}
 		return &AuthFS{
@@ -115,12 +115,12 @@ func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, g
 	}, nil
 }
 
-func (c *FsContext) LoadWebFS(r *http.Request, guest bool) (*AuthFS, error) {
+func (c *FsContext) LoadWebFS(r *http.Request, guestAccept bool) (*AuthFS, error) {
 	username, password, ok := r.BasicAuth()
 	if !ok {
 		username = "guest"
 	}
-	return c.LoadFS(username, password, nil, guest)
+	return c.LoadFS(username, password, nil, guestAccept)
 }
 
 func (c *FsContext) LoadUserFS(username string) afero.Fs {
