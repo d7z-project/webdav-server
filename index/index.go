@@ -11,7 +11,7 @@ import (
 func WithIndex(ctx *common.FsContext, route *chi.Mux) {
 	route.Get("/", func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("login") != "" {
-			if _, _, ok := request.BasicAuth(); !ok {
+			if user, _, ok := request.BasicAuth(); !ok || user == "guest" {
 				writer.Header().Add("WWW-Authenticate", `Basic realm="Webdav Server"`)
 				writer.WriteHeader(http.StatusUnauthorized)
 				return
