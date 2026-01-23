@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"code.d7z.net/packages/webdav-server/assets"
 	"code.d7z.net/packages/webdav-server/common"
 	"code.d7z.net/packages/webdav-server/dav"
+	"code.d7z.net/packages/webdav-server/index"
 	"code.d7z.net/packages/webdav-server/preview"
+	"code.d7z.net/packages/webdav-server/sftp_service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -64,42 +65,47 @@ func main() {
 	if debug {
 		route.Use(middleware.Logger)
 	}
-	route.Use(middleware.Timeout(60 * time.Second))
 	if cfg.Webdav.Enabled {
 		slog.Info("webdav enabled")
 		route.Route(cfg.Webdav.Prefix, dav.WithWebdav(ctx))
-
 	}
 	route.Route("/preview", preview.WithPreview(ctx))
-	listen, err := net.Listen("tcp", cfg.Bind)
+	index.WithIndex(ctx, route)
+
+	httpListen, err := net.Listen("tcp", cfg.Bind)
 	if err != nil {
-		slog.Error("listen err", "err", err)
+		slog.Error("listen http err", "err", err)
 		os.Exit(1)
 	}
-
-	route.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Query().Get("login") != "" {
-			if _, _, ok := request.BasicAuth(); !ok {
-				writer.Header().Add("WWW-Authenticate", `Basic realm="Webdav Server"`)
-				writer.WriteHeader(http.StatusUnauthorized)
-				return
-			}
+	var sftpListen net.Listener
+	var sftpServer *sftp_service.SFTPServer
+	if cfg.SFTP.Enabled {
+		sftpServer, err = sftp_service.NewSFTPServer(ctx)
+		if err != nil {
+			slog.Error("sftp init err", "err", err)
+			os.Exit(1)
 		}
-		writer.Header().Add("Content-Type", "text/html; charset=utf-8")
-		_ = assets.ZIndex.Execute(writer, map[string]interface{}{
-			"Config": cfg,
-		})
-	})
+		sftpListen, err = net.Listen("tcp", cfg.SFTP.Bind)
+		if err != nil {
+			slog.Error("listen sftp err", "err", err)
+			os.Exit(1)
+		}
+
+	}
 	server := http.Server{
 		Addr:    cfg.Bind,
 		Handler: route,
 	}
 	go func() {
-		if err := server.Serve(listen); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.Serve(httpListen); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("serve err", "err", err)
 		}
 	}()
 	go func() {
+		if sftpServer != nil && sftpListen != nil {
+			slog.Info("sftp enabled", "addr", cfg.SFTP.Bind)
+			sftpServer.Serve(ctx, sftpListen)
+		}
 	}()
 	<-osCtx.Done()
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)

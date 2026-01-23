@@ -20,7 +20,7 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Route("/", func(r chi.Router) {
 			r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-				fs, err := ctx.LoadFS(r, true)
+				fs, err := ctx.LoadWebFS(r, true)
 				if err != nil {
 					if errors.Is(err, common.NoAuthorizedError) {
 						w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
@@ -69,7 +69,7 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 			})
 			r.Post("/*", func(w http.ResponseWriter, r *http.Request) {
 				p := strings.TrimPrefix(r.URL.Path, "/preview")
-				fs, err := ctx.LoadFS(r, false)
+				fs, err := ctx.LoadWebFS(r, false)
 				if err != nil {
 					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 					return
@@ -102,6 +102,7 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 				destFile, err := fs.OpenFile(filepath.Join(destPath), os.O_WRONLY|os.O_CREATE, os.ModePerm)
 				if err != nil {
 					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+					return
 				}
 				defer destFile.Close()
 				_, err = io.Copy(destFile, file)

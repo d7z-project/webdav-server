@@ -27,7 +27,7 @@ func WithWebdav(ctx *common.FsContext) func(r chi.Router) {
 	locker := webdav.NewMemLS()
 	return func(r chi.Router) {
 		r.HandleFunc("/*", func(writer http.ResponseWriter, request *http.Request) {
-			loadFS, err := ctx.LoadFS(request, false)
+			loadFS, err := ctx.LoadWebFS(request, false)
 			if err != nil {
 				slog.Debug("no authorized filesystem", "err", err.Error())
 				if errors.Is(err, common.NoAuthorizedError) {

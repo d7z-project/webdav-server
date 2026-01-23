@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 
 	"code.d7z.net/packages/webdav-server/mergefs"
 	"github.com/spf13/afero"
@@ -69,26 +70,59 @@ type AuthFS struct {
 	afero.Fs
 }
 
-func (c *FsContext) LoadFS(r *http.Request, guest bool) (*AuthFS, error) {
-	username, password, ok := r.BasicAuth()
-	if !ok {
+func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, guest bool) (*AuthFS, error) {
+	if username == "guest" {
 		if !guest {
-			return nil, errors.Wrapf(NoAuthorizedError, "basic auth required")
+			return nil, errors.Wrapf(NoPermissionError, "guest not allowed")
 		}
 		return &AuthFS{
 			User: "guest",
 			Fs:   c.users["guest"],
 		}, nil
 	}
+	if password == "" && publicKey == nil {
+		return nil, errors.Wrapf(NoPermissionError, "no password or public key")
+	}
 	user, ok := c.Config.Users[username]
 	if !ok {
-		return nil, errors.Wrapf(NoAuthorizedError, "user pool %s not found", user)
+		return nil, errors.Wrapf(NoAuthorizedError, "user %s not found", username)
 	}
-	if user.Password != password {
-		return nil, errors.Wrapf(NoAuthorizedError, "user %s password not allowed", user)
+	if password != "" {
+		if user.Password != password {
+			return nil, errors.Wrapf(NoAuthorizedError, "user %s password not allowed", user)
+		}
+	}
+
+	if publicKey != nil {
+		matched := false
+		for _, key := range user.PublicKeys {
+			out, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+			if err != nil {
+				return nil, errors.Wrapf(NoAuthorizedError, "user %s public key parsing failed", username)
+			}
+			if string(out.Marshal()) == string(publicKey.Marshal()) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return nil, errors.Wrapf(NoAuthorizedError, "user %s public key not allowed", username)
+		}
 	}
 	return &AuthFS{
 		User: username,
 		Fs:   c.users[username],
 	}, nil
+}
+
+func (c *FsContext) LoadWebFS(r *http.Request, guest bool) (*AuthFS, error) {
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		username = "guest"
+	}
+	return c.LoadFS(username, password, nil, guest)
+}
+
+func (c *FsContext) LoadUserFS(username string) afero.Fs {
+	return c.users[username]
 }

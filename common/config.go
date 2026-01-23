@@ -10,6 +10,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/inhies/go-bytesize"
+	"golang.org/x/crypto/ssh"
 )
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -24,7 +25,6 @@ type Config struct {
 
 	Webdav  ConfigWebdav  `yaml:"webdav"`
 	SFTP    ConfigSFTP    `yaml:"sftp"`
-	NFS     ConfigNFS     `yaml:"nfs"`
 	Preview ConfigPreview `yaml:"preview"`
 }
 
@@ -33,12 +33,10 @@ type ConfigWebdav struct {
 	Prefix  string `yaml:"prefix"`
 }
 type ConfigSFTP struct {
-	Enabled bool   `yaml:"enabled"`
-	Bind    string `yaml:"bind"`
-}
-type ConfigNFS struct {
-	Enabled bool   `yaml:"enabled"`
-	Bind    string `yaml:"bind"`
+	Enabled        bool     `yaml:"enabled"`
+	Bind           string   `yaml:"bind"`
+	Privatekeys    []string `yaml:"private_keys"`
+	WelcomeMessage string   `yaml:"welcome_message"`
 }
 
 type FileSize uint64
@@ -61,8 +59,8 @@ type ConfigPreview struct {
 }
 
 type ConfigUser struct {
-	Password  string `yaml:"password"`
-	PublicKey string `yaml:"public_key"`
+	Password   string   `yaml:"password"`
+	PublicKeys []string `yaml:"public_keys"`
 }
 
 type ConfigPool struct {
@@ -103,13 +101,21 @@ func LoadConfig(filePath string) (*Config, error) {
 		if !nameRegexp.MatchString(name) {
 			return nil, fmt.Errorf("invalid user name: %s", name)
 		}
-		if user.Password == "" && user.PublicKey == "" {
+		if user.Password == "" && len(user.PublicKeys) == 0 {
 			slog.Warn("password or public key is not defined.", "user", name)
+		}
+		if len(user.PublicKeys) != 0 {
+			for _, key := range user.PublicKeys {
+				_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+				if err != nil {
+					return nil, fmt.Errorf("invalid public key(%s): %s", name, err)
+				}
+			}
 		}
 	}
 	result.Users["guest"] = ConfigUser{
-		Password:  "",
-		PublicKey: "",
+		Password:   "",
+		PublicKeys: make([]string, 0),
 	}
 	for poolName, pool := range result.Pools {
 		if !nameRegexp.MatchString(poolName) {
@@ -147,6 +153,26 @@ func LoadConfig(filePath string) (*Config, error) {
 	}
 	if result.Preview.MaxUploadSize == 0 {
 		result.Preview.MaxUploadSize = 1024 * 1024 * 1024
+	}
+	if result.SFTP.Enabled {
+		if len(result.SFTP.Privatekeys) == 0 {
+			return nil, errors.New("sftp need support private key , e.g. ssh-keygen -t rsa -f id_rsa -N ''")
+		}
+		for i, item := range result.SFTP.Privatekeys {
+			if !strings.HasPrefix(item, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+				data, err := os.ReadFile(item)
+				if err != nil {
+					return nil, fmt.Errorf("invalid private key item %d: %s", i, item)
+				}
+				result.SFTP.Privatekeys[i] = string(data)
+				if !strings.HasPrefix(string(data), "-----BEGIN OPENSSH PRIVATE KEY-----") {
+					return nil, fmt.Errorf("invalid private key item %d: %s", i, item)
+				}
+			}
+		}
+		if result.SFTP.WelcomeMessage == "" {
+			result.SFTP.WelcomeMessage = "Welcome to SFTP, %s !"
+		}
 	}
 	return &result, nil
 }
