@@ -71,6 +71,10 @@ func (s *SFTPServer) Serve(ctx *common.FsContext, listener net.Listener) {
 
 func (s *SFTPServer) handler(ctx *common.FsContext, conn net.Conn) {
 	defer conn.Close()
+	go func() {
+		<-ctx.Context().Done()
+		_ = conn.Close()
+	}()
 	sConn, chans, reqs, err := ssh.NewServerConn(conn, s.config)
 	if err != nil {
 		return

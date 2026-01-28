@@ -222,9 +222,9 @@ func (m *MountFs) crossRenameDir(srcFs afero.Fs, src string, dstFs afero.Fs, dst
 	if err != nil {
 		return err
 	}
-	defer dir.Close()
 
 	infos, err := dir.Readdir(-1)
+	_ = dir.Close()
 	if err != nil {
 		return err
 	}
