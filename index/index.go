@@ -16,6 +16,10 @@ func WithIndex(ctx *common.FsContext, route *chi.Mux) {
 				writer.WriteHeader(http.StatusUnauthorized)
 				return
 			}
+			if target := request.URL.Query().Get("return"); target != "" {
+				http.Redirect(writer, request, target, http.StatusFound)
+				return
+			}
 		}
 		writer.Header().Add("Content-Type", "text/html; charset=utf-8")
 		_ = assets.ZIndex.Execute(writer, map[string]interface{}{
