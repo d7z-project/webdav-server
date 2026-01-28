@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"code.d7z.net/packages/webdav-server/assets"
 	"code.d7z.net/packages/webdav-server/common"
 	"code.d7z.net/packages/webdav-server/dav"
 	"code.d7z.net/packages/webdav-server/index"
@@ -66,6 +67,10 @@ func main() {
 	if debug {
 		route.Use(middleware.Logger)
 	}
+
+	// Static files
+	route.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(assets.StaticFS))))
+
 	if cfg.Webdav.Enabled {
 		slog.Info("webdav enabled")
 		route.Route(cfg.Webdav.Prefix, dav.WithWebdav(ctx))

@@ -1,12 +1,16 @@
 package assets
 
 import (
+	"embed"
 	_ "embed"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/inhies/go-bytesize"
 )
+
+//go:embed style.css
+var StaticFS embed.FS
 
 //go:embed z-index.tmpl.html
 var zIndex string

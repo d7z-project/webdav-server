@@ -4,180 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebDAV Server</title>
-    <style>
-        :root {
-            /* Sakura Theme - Light Mode */
-            --c-primary: #ff85a2;      /* Vivid Sakura Pink */
-            --c-primary-hover: #ff6f91;
-            --c-bg: #fff0f5;           /* Lavender Blush Background */
-            --c-bg-gradient: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
-            --c-card: #ffffff;
-            --c-text: #594a4e;         /* Warm Dark Gray */
-            --c-sub: #9e8fa2;          /* Muted Purple-Gray */
-            --c-border: #f3d1dc;       /* Pale Pink Border */
-            --c-hover: #fff5f8;        /* Very Pale Pink Hover */
-            --shadow-card: 0 10px 40px rgba(255, 133, 162, 0.15);
-            --radius-lg: 24px;
-            --radius-md: 12px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                /* Sakura Theme - Dark Mode */
-                --c-primary: #ff9eb5;      /* Light Sakura Pink */
-                --c-primary-hover: #ffb6c1;
-                --c-bg: #2a2125;           /* Deep Warm Dark */
-                --c-bg-gradient: linear-gradient(135deg, #2a2125 0%, #1f181b 100%);
-                --c-card: #362b30;         /* Dark Plum Card */
-                --c-text: #fcecef;         /* Pale Pink Text */
-                --c-sub: #bbaab3;
-                --c-border: #4d3d44;
-                --c-hover: #403238;
-                --shadow-card: 0 15px 50px rgba(0, 0, 0, 0.4);
-            }
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        
-        body { 
-            background: var(--c-bg);
-            background-image: var(--c-bg-gradient);
-            color: var(--c-text); 
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: var(--c-card);
-            padding: 48px;
-            border-radius: var(--radius-lg);
-            width: 100%;
-            max-width: 520px;
-            box-shadow: var(--shadow-card);
-            border: 1px solid var(--c-border);
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .container::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 6px;
-            background: var(--c-primary);
-        }
-
-        h1 { margin-bottom: 12px; font-size: 28px; color: var(--c-primary); font-weight: 800; letter-spacing: -0.5px; }
-        p.subtitle { color: var(--c-sub); margin-bottom: 40px; font-size: 16px; }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--c-primary);
-            color: #fff;
-            text-decoration: none;
-            padding: 14px 32px;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(255, 133, 162, 0.3);
-            border: none;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 16px;
-        }
-        .btn:hover { background: var(--c-primary-hover); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(255, 133, 162, 0.45); }
-        .btn:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(255, 133, 162, 0.2); }
-        
-        .btn-outline {
-            background: transparent;
-            color: var(--c-primary);
-            border: 2px solid var(--c-primary);
-            box-shadow: none;
-        }
-        .btn-outline:hover { background: var(--c-primary); color: #fff; box-shadow: 0 4px 15px rgba(255, 133, 162, 0.3); }
-
-        .card-info {
-            margin-top: 32px;
-            background: var(--c-hover);
-            padding: 20px;
-            border-radius: var(--radius-md);
-            border: 1px solid var(--c-border);
-            text-align: left;
-        }
-        .card-info h3 { font-size: 14px; text-transform: uppercase; color: var(--c-sub); margin-bottom: 12px; letter-spacing: 1px; }
-        .code-block {
-            background: var(--c-card);
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--c-border);
-            font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
-            font-size: 13px;
-            word-break: break-all;
-            color: var(--c-text);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-        }
-        .copy-btn {
-            background: none; border: none; color: var(--c-primary); cursor: pointer; font-size: 12px; font-weight: bold;
-        }
-        .copy-btn:hover { text-decoration: underline; }
-
-        .footer { margin-top: 32px; font-size: 13px; color: var(--c-sub); }
-        
-        .icon-box {
-            width: 64px; height: 64px; background: var(--c-hover); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            margin: 0 auto 20px; color: var(--c-primary); font-size: 32px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="layout-center">
 
-<div class="container">
+<div class="container container-md">
     <div class="icon-box">☁️</div>
     <h1>简易文件服务器</h1>
     <p class="subtitle">Simple WebDAV & File Server</p>
 
-    <a href="/preview/" class="btn">📂 浏览文件 (Preview)</a>
+    <a href="/preview/" class="btn btn-block">浏览文件 (Preview)</a>
     
     {{if .IsLogged }}
-    <a href="/logout" class="btn btn-outline">👋 注销 (Logout {{.User}})</a>
+    <a href="/logout" class="btn btn-outline btn-block">注销 (Logout {{.User}})</a>
     {{else}}
-    <a href="/login" class="btn btn-outline">🔐 登录 (Login)</a>
+    <a href="/login" class="btn btn-outline btn-block">登录 (Login)</a>
     {{end}}
 
     {{if .Config.Webdav.Enabled }}
     <div class="card-info">
-        <h3>WebDAV 连接地址</h3>
-        <div class="code-block">
-            <span id="webdav-url">Loading...</span>
-            <button class="copy-btn" onclick="copyToClipboard('webdav-url')">复制</button>
+        <h3>WebDAV</h3>
+        <div class="info-group">
+            <div class="info-label">连接地址</div>
+            <div class="code-block">
+                <span id="webdav-url">Loading...</span>
+                <button class="copy-btn" onclick="copyToClipboard('webdav-url')">复制</button>
+            </div>
         </div>
     </div>
     {{end}}
 
     {{if .Config.SFTP.Enabled }}
-    <div class="card-info" style="margin-top: 16px;">
-        <h3>SFTP 连接地址</h3>
-        <div class="code-block">
-            <span id="sftp-url">sftp://Loading...</span>
-            <button class="copy-btn" onclick="copyToClipboard('sftp-url')">复制</button>
+    <div class="card-info">
+        <h3>SFTP / SSHFS</h3>
+        
+        <div class="info-group">
+            <div class="info-label">SFTP 连接地址</div>
+            <div class="code-block">
+                <span id="sftp-url">sftp://Loading...</span>
+                <button class="copy-btn" onclick="copyToClipboard('sftp-url')">复制</button>
+            </div>
         </div>
-    </div>
 
-    <div class="card-info" style="margin-top: 16px;">
-        <h3>SSHFS 挂载命令</h3>
-        <div class="code-block">
-            <span id="sshfs-cmd">sshfs -p PORT user@host:/ ./mnt</span>
-            <button class="copy-btn" onclick="copyToClipboard('sshfs-cmd')">复制</button>
+        <div class="info-group">
+            <div class="info-label">SSHFS 挂载命令</div>
+            <div class="code-block">
+                <span id="sshfs-cmd">sshfs -p PORT user@host:/ ./mnt</span>
+                <button class="copy-btn" onclick="copyToClipboard('sshfs-cmd')">复制</button>
+            </div>
         </div>
     </div>
     {{end}}
@@ -215,10 +89,18 @@
         sftpPort = "22"; // Fallback default
     }
 
-    const sftpUrl = `sftp://${hostname}:${sftpPort}`;
-    document.getElementById("sftp-url").textContent = sftpUrl;
+    let sftpUrl = "";
+    let sshfsCmd = "";
 
-    const sshfsCmd = `sshfs -p ${sftpPort} user@${hostname}:/ ./mnt`;
+    if (sftpPort === "22") {
+        sftpUrl = `sftp://${hostname}`;
+        sshfsCmd = `sshfs {{ .User }}@${hostname}:/ ./mnt`;
+    } else {
+        sftpUrl = `sftp://${hostname}:${sftpPort}`;
+        sshfsCmd = `sshfs -p ${sftpPort} {{ .User }}@${hostname}:/ ./mnt`;
+    }
+
+    document.getElementById("sftp-url").textContent = sftpUrl;
     document.getElementById("sshfs-cmd").textContent = sshfsCmd;
     {{end}}
 </script>
