@@ -39,7 +39,7 @@ func TestWithIndexRedirect(t *testing.T) {
 	// and valid (handled by middleware or just parsed here).
 	// In index.go: `if user, _, ok := request.BasicAuth(); !ok || user == "guest" { ... }`
 	// So we just need to provide ANY basic auth that is not "guest".
-	
+
 	w3 := httptest.NewRecorder()
 	r.ServeHTTP(w3, req3)
 	assert.Equal(t, http.StatusFound, w3.Code)

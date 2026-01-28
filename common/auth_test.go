@@ -23,7 +23,7 @@ func TestVerifyPassword(t *testing.T) {
 	// Argon2id
 	// We use a known good hash if possible, or generate one here for testing
 	// $argon2id$v=19$m=16,t=2,p=1$c2FsdHNhbHQ$i8VInoFfTDCb/C/8R5xJpA was my manual attempt
-	
+
 	// Let's generate one to be sure
 	salt := []byte("saltsalt")
 	hash := argon2.IDKey([]byte("password"), salt, 2, 16, 1, 16)
@@ -31,7 +31,7 @@ func TestVerifyPassword(t *testing.T) {
 		argon2.Version, 16, 2, 1,
 		base64.RawStdEncoding.EncodeToString(salt),
 		base64.RawStdEncoding.EncodeToString(hash))
-	
+
 	assert.True(t, verifyPassword(generatedArgon2id, "password"))
 	assert.False(t, verifyPassword(generatedArgon2id, "wrong"))
 
