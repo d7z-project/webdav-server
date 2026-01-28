@@ -218,15 +218,22 @@ func (c *FsContext) VerifyToken(token string) (string, error) {
 	return user, nil
 }
 
-func (c *FsContext) LoadWebFS(r *http.Request, guestAccept bool) (*AuthFS, error) {
+func (c *FsContext) GetUserFromCookie(r *http.Request) (string, error) {
 	if cookie, err := r.Cookie("webdav_session"); err == nil {
 		if user, err := c.VerifyToken(cookie.Value); err == nil {
-			if fs, ok := c.users[user]; ok {
-				return &AuthFS{
-					User: user,
-					Fs:   fs,
-				}, nil
-			}
+			return user, nil
+		}
+	}
+	return "", errors.New("no valid session found")
+}
+
+func (c *FsContext) LoadWebFS(r *http.Request, guestAccept bool) (*AuthFS, error) {
+	if user, err := c.GetUserFromCookie(r); err == nil {
+		if fs, ok := c.users[user]; ok {
+			return &AuthFS{
+				User: user,
+				Fs:   fs,
+			}, nil
 		}
 	}
 

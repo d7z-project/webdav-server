@@ -71,10 +71,8 @@ func WithIndex(ctx *common.FsContext, route *chi.Mux) {
 	route.Get("/", func(writer http.ResponseWriter, request *http.Request) {
 		// Check for existing session
 		var currentUser string
-		if cookie, err := request.Cookie("webdav_session"); err == nil {
-			if user, err := ctx.VerifyToken(cookie.Value); err == nil {
-				currentUser = user
-			}
+		if user, err := ctx.GetUserFromCookie(request); err == nil {
+			currentUser = user
 		}
 
 		// If login param is present, redirect to login page (legacy support or direct link)

@@ -1,10 +1,10 @@
 package preview
 
 import (
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -32,21 +32,24 @@ func WithPreview(ctx *common.FsContext) func(r chi.Router) {
 	}
 }
 
+func loadPreviewFS(ctx *common.FsContext, r *http.Request) (*common.AuthFS, error) {
+	// 1. Try Session Cookie
+	if user, err := ctx.GetUserFromCookie(r); err == nil {
+		if ufs := ctx.LoadUserFS(user); ufs != nil {
+			return &common.AuthFS{User: user, Fs: ufs}, nil
+		}
+	}
+
+	// 2. Fallback to Guest
+	return ctx.LoadFS("guest", "", nil, true)
+}
+
 func handleGet(ctx *common.FsContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fs, err := ctx.LoadWebFS(r, true)
+		fs, err := loadPreviewFS(ctx, r)
 		if err != nil {
-			username, _, _ := r.BasicAuth()
-			if username == "" {
-				username = "guest"
-			}
-			slog.Warn("|security| Login failed.", "source", "preview", "remote", r.RemoteAddr, "user", username, "err", err)
-			if errors.Is(err, common.NoAuthorizedError) {
-				w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusNotFound)
+			slog.Debug("|preview| Auth failed, redirecting to login.", "remote", r.RemoteAddr, "err", err)
+			http.Redirect(w, r, "/login?return="+url.QueryEscape(r.URL.Path), http.StatusFound)
 			return
 		}
 		slog.Info("|preview| Access.", "path", r.URL.Path, "remote", r.RemoteAddr, "user", fs.User)
@@ -93,13 +96,9 @@ func handleGet(ctx *common.FsContext) http.HandlerFunc {
 func handlePost(ctx *common.FsContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(r.URL.Path, "/preview")
-		fs, err := ctx.LoadWebFS(r, false)
+		fs, err := loadPreviewFS(ctx, r)
 		if err != nil {
-			username, _, _ := r.BasicAuth()
-			if username == "" {
-				username = "guest"
-			}
-			slog.Warn("|security| Login failed.", "source", "preview_upload", "remote", r.RemoteAddr, "user", username, "err", err)
+			slog.Warn("|security| Login failed.", "source", "preview_upload", "remote", r.RemoteAddr, "err", err)
 			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
