@@ -25,6 +25,7 @@ func NewSFTPServer(ctx *common.FsContext) (*SFTPServer, error) {
 					"remote", conn.RemoteAddr().String(), "user", conn.User(), "key", string(key.Marshal()))
 				return nil, err
 			}
+			slog.Info("|security| Login success.", "mode", "publicKey", "remote", conn.RemoteAddr().String(), "user", conn.User())
 			return nil, nil
 		},
 	}
@@ -36,6 +37,7 @@ func NewSFTPServer(ctx *common.FsContext) (*SFTPServer, error) {
 					"remote", conn.RemoteAddr().String(), "user", conn.User())
 				return nil, err
 			}
+			slog.Info("|security| Login success.", "mode", "password", "remote", conn.RemoteAddr().String(), "user", conn.User())
 			return nil, nil
 		}
 	}
@@ -105,6 +107,7 @@ func (s *SFTPServer) handler(ctx *common.FsContext, conn net.Conn) {
 				case "subsystem":
 					if string(req.Payload[4:]) == "sftp" {
 						_ = req.Reply(true, nil)
+						slog.Info("|sftp| Session started.", "remote", sConn.RemoteAddr().String(), "user", sConn.User())
 						userFS := ctx.LoadUserFS(sConn.User())
 						server := sftp.NewRequestServer(channel, FSHandlers(userFS))
 						if err := server.Serve(); err != nil && err != io.EOF {

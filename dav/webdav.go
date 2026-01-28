@@ -47,6 +47,7 @@ func WithWebdav(ctx *common.FsContext) func(r chi.Router) {
 				}
 				return
 			}
+			slog.Info("|webdav| Request.", "method", request.Method, "path", request.URL.Path, "remote", request.RemoteAddr, "user", loadFS.User)
 			handler := &webdav.Handler{
 				Prefix:     ctx.Config.Webdav.Prefix,
 				FileSystem: NewWebdavFS(loadFS),

@@ -49,6 +49,7 @@ func handleGet(ctx *common.FsContext) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		slog.Info("|preview| Access.", "path", r.URL.Path, "remote", r.RemoteAddr, "user", fs.User)
 		p := strings.TrimPrefix(r.URL.Path, "/preview/")
 		stat, err := fs.Stat(p)
 		if err != nil {
@@ -140,6 +141,7 @@ func handleMkdir(w http.ResponseWriter, r *http.Request, fs *common.AuthFS, p st
 		http.Error(w, "创建失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	slog.Info("|preview| Mkdir.", "path", target, "remote", r.RemoteAddr, "user", fs.User)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -167,6 +169,7 @@ func handleRename(w http.ResponseWriter, r *http.Request, fs *common.AuthFS, p s
 		http.Error(w, "重命名失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	slog.Info("|preview| Rename.", "old", oldPath, "new", newPath, "remote", r.RemoteAddr, "user", fs.User)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -186,6 +189,7 @@ func handleDelete(w http.ResponseWriter, r *http.Request, fs *common.AuthFS, p s
 		http.Error(w, "删除失败: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	slog.Info("|preview| Delete.", "path", target, "remote", r.RemoteAddr, "user", fs.User)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -226,5 +230,6 @@ func handleUpload(w http.ResponseWriter, r *http.Request, fs *common.AuthFS, p s
 		http.Error(w, "上传失败", http.StatusInternalServerError)
 		return
 	}
+	slog.Info("|preview| Upload.", "path", destPath, "remote", r.RemoteAddr, "user", fs.User)
 	w.WriteHeader(http.StatusOK)
 }
