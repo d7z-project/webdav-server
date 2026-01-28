@@ -343,7 +343,7 @@
     <div class="actions">
         <span class="user-tag">用户: <b>{{ .User }}</b></span>
         {{ if .IsGuest }}
-        <a href="/?login=true&return=/preview/{{ .Path }}" class="btn">登录</a>
+        <a href="/login?return=/preview/{{ .Path }}" class="btn">登录</a>
         {{ else }}
         <button class="btn btn-sub" onclick="openMkdir()">+ 文件夹</button>
         <button class="btn" onclick="document.getElementById('f-input').click()">+ 上传</button>

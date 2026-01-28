@@ -147,7 +147,12 @@
     <p class="subtitle">Simple WebDAV & File Server</p>
 
     <a href="/preview/" class="btn">📂 浏览文件 (Preview)</a>
-    <a href="/?login=true" class="btn btn-outline">🔐 登录 (Login)</a>
+    
+    {{if .IsLogged }}
+    <a href="/logout" class="btn btn-outline">👋 注销 (Logout {{.User}})</a>
+    {{else}}
+    <a href="/login" class="btn btn-outline">🔐 登录 (Login)</a>
+    {{end}}
 
     {{if .Config.Webdav.Enabled }}
     <div class="card-info">

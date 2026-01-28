@@ -2,13 +2,16 @@ package common
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/argon2"
@@ -72,9 +75,10 @@ func verifyArgon2id(encodedHash, password string) bool {
 }
 
 type FsContext struct {
-	ctx    context.Context
-	Config *Config
-	users  map[string]afero.Fs
+	ctx       context.Context
+	Config    *Config
+	users     map[string]afero.Fs
+	secretKey []byte
 }
 
 func (c *FsContext) Context() context.Context {
@@ -82,10 +86,15 @@ func (c *FsContext) Context() context.Context {
 }
 
 func NewContext(ctx context.Context, cfg *Config) (*FsContext, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
 	f := &FsContext{
-		ctx:    ctx,
-		Config: cfg,
-		users:  make(map[string]afero.Fs),
+		ctx:       ctx,
+		Config:    cfg,
+		users:     make(map[string]afero.Fs),
+		secretKey: key,
 	}
 	pools := make(map[string]afero.Fs)
 	osFs := afero.NewOsFs()
@@ -168,7 +177,59 @@ func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, g
 	}, nil
 }
 
+func (c *FsContext) SignToken(user string) string {
+	// format: user.timestamp.signature
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	data := base64.RawURLEncoding.EncodeToString([]byte(user)) + "." + ts
+	h := sha256.New()
+	h.Write([]byte(data))
+	h.Write(c.secretKey)
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	return data + "." + sig
+}
+
+func (c *FsContext) VerifyToken(token string) (string, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", errors.New("invalid token format")
+	}
+	userBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return "", errors.New("invalid user encoding")
+	}
+	user := string(userBytes)
+	ts, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return "", errors.New("invalid timestamp")
+	}
+	if time.Now().Unix()-ts > 86400*7 { // 7 days expiration
+		return "", errors.New("token expired")
+	}
+
+	data := parts[0] + "." + parts[1]
+	h := sha256.New()
+	h.Write([]byte(data))
+	h.Write(c.secretKey)
+	expectedSig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+	if subtle.ConstantTimeCompare([]byte(parts[2]), []byte(expectedSig)) != 1 {
+		return "", errors.New("invalid signature")
+	}
+	return user, nil
+}
+
 func (c *FsContext) LoadWebFS(r *http.Request, guestAccept bool) (*AuthFS, error) {
+	if cookie, err := r.Cookie("webdav_session"); err == nil {
+		if user, err := c.VerifyToken(cookie.Value); err == nil {
+			if fs, ok := c.users[user]; ok {
+				return &AuthFS{
+					User: user,
+					Fs:   fs,
+				}, nil
+			}
+		}
+	}
+
 	username, password, ok := r.BasicAuth()
 	if !ok {
 		username = "guest"

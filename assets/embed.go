@@ -14,9 +14,13 @@ var zIndex string
 //go:embed z-preview.tmpl.html
 var zPreview string
 
+//go:embed z-login.tmpl.html
+var zLogin string
+
 var (
 	ZIndex   *template.Template
 	ZPreview *template.Template
+	ZLogin   *template.Template
 )
 
 func init() {
@@ -31,6 +35,10 @@ func init() {
 		panic(err)
 	}
 	ZPreview, err = template.New("preview").Funcs(funcMap).Parse(zPreview)
+	if err != nil {
+		panic(err)
+	}
+	ZLogin, err = template.New("login").Funcs(funcMap).Parse(zLogin)
 	if err != nil {
 		panic(err)
 	}
