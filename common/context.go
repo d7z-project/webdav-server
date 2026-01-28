@@ -2,11 +2,16 @@ package common
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/ssh"
 
 	"code.d7z.net/packages/webdav-server/mergefs"
@@ -17,6 +22,54 @@ var (
 	NoAuthorizedError = errors.New("no authorized")
 	NoPermissionError = errors.New("no permission")
 )
+
+func verifyPassword(hashedPassword, plainPassword string) bool {
+	if strings.HasPrefix(hashedPassword, "argon2id:") {
+		return verifyArgon2id(strings.TrimPrefix(hashedPassword, "argon2id:"), plainPassword)
+	}
+	if strings.HasPrefix(hashedPassword, "sha256:") {
+		expectedHash := strings.TrimPrefix(hashedPassword, "sha256:")
+		sum := sha256.Sum256([]byte(plainPassword))
+		actualHash := fmt.Sprintf("%x", sum)
+		return subtle.ConstantTimeCompare([]byte(expectedHash), []byte(actualHash)) == 1
+	}
+	return hashedPassword == plainPassword
+}
+
+func verifyArgon2id(encodedHash, password string) bool {
+	// Standard modular crypt format: $argon2id$v=19$m=65536,t=3,p=4$salt$hash
+	vals := strings.Split(encodedHash, "$")
+	if len(vals) != 6 {
+		return false
+	}
+
+	var version int
+	_, err := fmt.Sscanf(vals[2], "v=%d", &version)
+	if err != nil {
+		return false
+	}
+
+	var memory uint32
+	var iterations uint32
+	var parallelism uint8
+	_, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism)
+	if err != nil {
+		return false
+	}
+
+	salt, err := base64.RawStdEncoding.DecodeString(vals[4])
+	if err != nil {
+		return false
+	}
+
+	hash, err := base64.RawStdEncoding.DecodeString(vals[5])
+	if err != nil {
+		return false
+	}
+
+	otherHash := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(hash)))
+	return subtle.ConstantTimeCompare(hash, otherHash) == 1
+}
 
 type FsContext struct {
 	ctx    context.Context
@@ -88,7 +141,7 @@ func (c *FsContext) LoadFS(username, password string, publicKey ssh.PublicKey, g
 		return nil, errors.Wrapf(NoAuthorizedError, "user %s not found", username)
 	}
 	if password != "" {
-		if user.Password != password {
+		if !verifyPassword(user.Password, password) {
 			return nil, errors.Wrapf(NoAuthorizedError, "user %s password not allowed", username)
 		}
 	}
