@@ -11,6 +11,7 @@ require (
 	github.com/pkg/sftp v1.13.10
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.11.1
+	github.com/yuin/goldmark v1.7.16
 	golang.org/x/crypto v0.47.0
 	golang.org/x/net v0.49.0
 )

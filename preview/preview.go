@@ -1,6 +1,8 @@
 package preview
 
 import (
+	"bytes"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +16,7 @@ import (
 	"code.d7z.net/packages/webdav-server/common"
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/afero"
+	"github.com/yuin/goldmark"
 )
 
 type TemplateData struct {
@@ -21,6 +24,7 @@ type TemplateData struct {
 	User    string
 	Dirs    []os.FileInfo
 	IsGuest bool
+	Readme  template.HTML
 }
 
 func WithPreview(ctx *common.FsContext) func(r chi.Router) {
@@ -73,12 +77,41 @@ func handleGet(ctx *common.FsContext) http.HandlerFunc {
 				}
 				return 1
 			})
+
+			var readmeHtml template.HTML
+			var readmeName string
+			readmeFiles := []string{"README.md", "README.txt"}
+
+			for _, name := range readmeFiles {
+				idx := slices.IndexFunc(dir, func(fi os.FileInfo) bool {
+					return !fi.IsDir() && strings.EqualFold(fi.Name(), name)
+				})
+				if idx != -1 {
+					readmeName = dir[idx].Name()
+					break
+				}
+			}
+
+			if readmeName != "" {
+				if f, err := fs.OpenFile(filepath.Join(p, readmeName), os.O_RDONLY, 0); err == nil {
+					// Limit read size to 256KB to prevent memory exhaustion
+					if data, err := io.ReadAll(io.LimitReader(f, 256*1024)); err == nil {
+						var buf bytes.Buffer
+						if err := goldmark.Convert(data, &buf); err == nil {
+							readmeHtml = template.HTML(buf.String())
+						}
+					}
+					f.Close()
+				}
+			}
+
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_ = assets.ZPreview.Execute(w, TemplateData{
 				Path:    p,
 				User:    fs.User,
 				Dirs:    dir,
 				IsGuest: fs.User == "guest",
+				Readme:  readmeHtml,
 			})
 		} else {
 			file, err := fs.OpenFile(p, os.O_RDONLY, os.ModePerm)

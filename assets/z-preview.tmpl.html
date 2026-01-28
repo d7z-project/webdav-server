@@ -149,6 +149,24 @@
             border: 1px solid var(--c-border);
             box-shadow: var(--shadow-card);
         }
+        
+        .readme-wrap {
+            background: var(--c-card);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-top: 24px;
+            border: 1px solid var(--c-border);
+            box-shadow: var(--shadow-card);
+        }
+        .readme-wrap h1, .readme-wrap h2, .readme-wrap h3 { margin-top: 1.5em; margin-bottom: 0.8em; color: var(--c-text); }
+        .readme-wrap p { margin-bottom: 1em; }
+        .readme-wrap code { background: var(--c-hover); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        .readme-wrap pre { background: var(--c-hover); padding: 16px; border-radius: var(--radius-md); overflow-x: auto; margin-bottom: 1em; }
+        .readme-wrap pre code { background: transparent; padding: 0; }
+        .readme-wrap img { max-width: 100%; border-radius: var(--radius-sm); }
+        .readme-wrap a { color: var(--c-primary); text-decoration: underline; }
+        .readme-wrap blockquote { border-left: 4px solid var(--c-primary); padding-left: 16px; color: var(--c-sub); margin: 1em 0; }
+        
         table { width: 100%; border-collapse: separate; border-spacing: 0; }
         th {
             text-align: left;
@@ -391,6 +409,12 @@
         </tbody>
     </table>
 </div>
+
+{{ if .Readme }}
+<div class="readme-wrap">
+    {{ .Readme }}
+</div>
+{{ end }}
 
 <script>
     // 工具函数

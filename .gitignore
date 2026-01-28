@@ -5,3 +5,4 @@
 project.yaml
 config.local.yaml
 server-linux-*
+webdav-server
