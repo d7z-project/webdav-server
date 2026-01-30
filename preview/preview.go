@@ -52,7 +52,7 @@ func handleGet(ctx *common.FsContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fs, err := loadPreviewFS(ctx, r)
 		if err != nil {
-			slog.Debug("|preview| Auth failed, redirecting to login.", "remote", r.RemoteAddr, "err", err)
+			slog.Debug("|preview| Auth failed, redirecting to login.", "remote", r.RemoteAddr)
 			http.Redirect(w, r, "/login?return="+url.QueryEscape(r.URL.Path), http.StatusFound)
 			return
 		}
@@ -104,7 +104,6 @@ func handleGet(ctx *common.FsContext) http.HandlerFunc {
 					f.Close()
 				}
 			}
-
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_ = assets.ZPreview.Execute(w, TemplateData{
 				Path:    p,
@@ -131,7 +130,7 @@ func handlePost(ctx *common.FsContext) http.HandlerFunc {
 		p := strings.TrimPrefix(r.URL.Path, "/preview")
 		fs, err := loadPreviewFS(ctx, r)
 		if err != nil {
-			slog.Warn("|security| Login failed.", "source", "preview_upload", "remote", r.RemoteAddr, "err", err)
+			slog.Warn("|security| Login failed.", "source", "preview_upload", "remote", r.RemoteAddr)
 			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}

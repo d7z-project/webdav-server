@@ -33,14 +33,17 @@ func WithWebdav(ctx *common.FsContext) func(r chi.Router) {
 				if username == "" {
 					username = "guest"
 				}
-				slog.Warn("|security| Login failed.", "source", "webdav", "remote", request.RemoteAddr, "user", username, "err", err)
-
-				slog.Debug("no authorized filesystem", "err", err.Error())
+				slog.Warn("|security| Login failed.", "source", "webdav", "remote", request.RemoteAddr, "user", username, "err", err.Error())
 				if errors.Is(err, common.NoAuthorizedError) {
 					writer.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 					http.Error(writer, err.Error(), http.StatusUnauthorized)
 				} else if errors.Is(err, common.NoPermissionError) {
-					http.Error(writer, err.Error(), http.StatusForbidden)
+					if username == "guest" {
+						writer.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+						http.Error(writer, err.Error(), http.StatusUnauthorized)
+					} else {
+						http.Error(writer, err.Error(), http.StatusForbidden)
+					}
 				} else {
 					slog.Error("未知错误 ！", "err", err.Error())
 					http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
